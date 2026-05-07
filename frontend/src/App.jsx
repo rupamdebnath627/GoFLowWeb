@@ -5,11 +5,16 @@ function App() {
   const [status, setStatus] = useState('');
 
   const handleExecute = async ({ nodes, edges }) => {
+    const payload = {
+      nodes: nodes.map(({ id, data }) => ({ id, data: { label: data.label } })),
+      edges: edges.map(({ id, source, target }) => ({ id, source, target })),
+    };
+
     try {
       const response = await fetch('http://localhost:8080/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
