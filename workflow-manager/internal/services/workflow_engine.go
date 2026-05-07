@@ -2,34 +2,46 @@ package services
 
 import (
 	"fmt"
+	"os/exec"
+	"sync"
 	"time"
 
 	"GoFlowWeb/internal/models"
 )
 
+type taskResult struct {
+	nodeID string
+	output string
+	err    error
+}
+
 type WorkflowEngine struct {
 	labels   map[string]string   // NodeID -> label
+	commands map[string]string   // NodeID -> command
 	children map[string][]string // adjacency list
 	indegree map[string]int      // dependency counter
-	logs     []models.TaskLog    // execution logs
+	mu       sync.Mutex
+	logs     []models.TaskLog
 }
 
 func NewWorkflowEngine() *WorkflowEngine {
 	return &WorkflowEngine{
 		labels:   make(map[string]string),
+		commands: make(map[string]string),
 		children: make(map[string][]string),
 		indegree: make(map[string]int),
 	}
 }
 
-func (we *WorkflowEngine) AddTask(id string, label string) {
+func (we *WorkflowEngine) AddTask(id, label, command string) {
 	we.labels[id] = label
+	we.commands[id] = command
 	if _, exists := we.indegree[id]; !exists {
 		we.indegree[id] = 0
 	}
 }
 
-func (we *WorkflowEngine) AddDependency(from string, to string) {
+func (we *WorkflowEngine) AddDependency(from, to string) {
 	we.children[from] = append(we.children[from], to)
 	we.indegree[to]++
 }
@@ -37,12 +49,16 @@ func (we *WorkflowEngine) AddDependency(from string, to string) {
 func (we *WorkflowEngine) Execute() []models.TaskLog {
 	totalTasks := len(we.labels)
 	completedTasks := 0
-	doneCh := make(chan string, totalTasks)
+	doneCh := make(chan taskResult, totalTasks)
 
 	fmt.Println("--- Starting Workflow Engine ---")
 	fmt.Println("Nodes:")
 	for id, label := range we.labels {
-		fmt.Printf("  %s: %s (indegree=%d)\n", id, label, we.indegree[id])
+		cmd := we.commands[id]
+		if cmd == "" {
+			cmd = "(no command)"
+		}
+		fmt.Printf("  %s: %s (indegree=%d) cmd=%q\n", id, label, we.indegree[id], cmd)
 	}
 	fmt.Println("Edges:")
 	for parent, kids := range we.children {
@@ -57,20 +73,30 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 		}
 	}
 
-	timeout := time.After(time.Duration(totalTasks*2+10) * time.Second)
+	timeout := time.After(time.Duration(totalTasks*30+30) * time.Second)
 	for completedTasks < totalTasks {
 		select {
-		case completedNodeID := <-doneCh:
+		case result := <-doneCh:
 			completedTasks++
-			fmt.Printf("[%s] Completed (%d/%d)\n", completedNodeID, completedTasks, totalTasks)
 
+			status := "completed"
+			if result.err != nil {
+				status = "failed"
+				fmt.Printf("[%s] Failed (%d/%d): %v\n", result.nodeID, completedTasks, totalTasks, result.err)
+			} else {
+				fmt.Printf("[%s] Completed (%d/%d)\n", result.nodeID, completedTasks, totalTasks)
+			}
+
+			we.mu.Lock()
 			we.logs = append(we.logs, models.TaskLog{
-				NodeID: completedNodeID,
-				Label:  we.labels[completedNodeID],
-				Status: "completed",
+				NodeID: result.nodeID,
+				Label:  we.labels[result.nodeID],
+				Status: status,
+				Output: result.output,
 			})
+			we.mu.Unlock()
 
-			for _, childID := range we.children[completedNodeID] {
+			for _, childID := range we.children[result.nodeID] {
 				we.indegree[childID]--
 				if we.indegree[childID] == 0 {
 					go we.runTask(childID, doneCh)
@@ -84,11 +110,13 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 					fmt.Printf("  %s: %s (indegree=%d)\n", id, we.labels[id], deg)
 				}
 			}
+			we.mu.Lock()
 			we.logs = append(we.logs, models.TaskLog{
 				NodeID: "engine",
 				Label:  "Workflow timed out - possible cycle or missing edges",
 				Status: "error",
 			})
+			we.mu.Unlock()
 			return we.logs
 		}
 	}
@@ -97,18 +125,37 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 	return we.logs
 }
 
-func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- string) {
+func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- taskResult) {
 	label := we.labels[nodeID]
+	command := we.commands[nodeID]
+
 	fmt.Printf("[%s] Executing: %s\n", nodeID, label)
-	time.Sleep(1 * time.Second)
-	doneCh <- nodeID
+
+	if command == "" {
+		fmt.Printf("[%s] No command, skipping\n", nodeID)
+		doneCh <- taskResult{nodeID: nodeID, output: "(no command)"}
+		return
+	}
+
+	fmt.Printf("[%s] Running: %s\n", nodeID, command)
+	cmd := exec.Command("bash", "-c", command)
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	if err != nil {
+		doneCh <- taskResult{nodeID: nodeID, output: output, err: fmt.Errorf("%s: %w", output, err)}
+		return
+	}
+
+	fmt.Printf("[%s] Output: %s\n", nodeID, output)
+	doneCh <- taskResult{nodeID: nodeID, output: output}
 }
 
 func ExecuteWorkflow(nodes []models.Node, edges []models.Edge) []models.TaskLog {
 	engine := NewWorkflowEngine()
 
 	for _, node := range nodes {
-		engine.AddTask(node.ID, node.Data.Label)
+		engine.AddTask(node.ID, node.Data.Label, node.Data.Command)
 	}
 
 	for _, edge := range edges {

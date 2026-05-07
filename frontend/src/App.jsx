@@ -23,7 +23,7 @@ function App() {
     }
 
     const payload = {
-      nodes: nodes.map(({ id, data }) => ({ id, data: { label: data.label } })),
+      nodes: nodes.map(({ id, data }) => ({ id, data: { label: data.label, command: data.command || '' } })),
       edges: edges.map(({ id, source, target }) => ({ id, source, target })),
     };
 

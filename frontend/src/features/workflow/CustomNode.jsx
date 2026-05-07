@@ -9,6 +9,11 @@ function CustomNode({ data }) {
       <Handle type="target" position={Position.Left} id="target-left" className={styles.targetHandle} style={{ top: '25%' }} />
       <Handle type="target" position={Position.Right} id="target-right" className={styles.targetHandle} style={{ top: '25%' }} />
       <span>{data.label}</span>
+      {data.command && (
+        <div className={styles.command} title={data.command}>
+          {data.command.length > 30 ? data.command.slice(0, 30) + '...' : data.command}
+        </div>
+      )}
       <Handle type="source" position={Position.Top} id="source-top" className={styles.sourceHandle} style={{ left: '65%' }} />
       <Handle type="source" position={Position.Bottom} id="source-bottom" className={styles.sourceHandle} style={{ left: '65%' }} />
       <Handle type="source" position={Position.Left} id="source-left" className={styles.sourceHandle} style={{ top: '75%' }} />

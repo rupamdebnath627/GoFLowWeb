@@ -30,7 +30,8 @@
 }
 
 .input,
-.select {
+.select,
+.textarea {
   padding: 7px 10px;
   background-color: #282c34;
   border: 1px solid #3a3f4b;
@@ -40,9 +41,33 @@
   outline: none;
 }
 
+.textarea {
+  resize: vertical;
+  font-family: monospace;
+  min-height: 60px;
+}
+
 .input:focus,
-.select:focus {
+.select:focus,
+.textarea:focus {
   border-color: #61dafb;
+}
+
+.fileLabel {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 5px 10px;
+  background-color: #3a3f4b;
+  border-radius: 4px;
+  color: #9ca3af;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.fileLabel:hover {
+  background-color: #4a4f5b;
+  color: #ffffff;
 }
 
 .select option {

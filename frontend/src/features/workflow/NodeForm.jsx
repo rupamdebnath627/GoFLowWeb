@@ -1,17 +1,27 @@
 import { useState } from 'react';
 import styles from './NodeForm.module.css';
 
-const NODE_TYPES = ['Task', 'Decision', 'Process', 'Action'];
+const NODE_TYPES = ['Task', 'Decision'];
 
 function NodeForm({ nodes, onAddNode }) {
   const [label, setLabel] = useState('');
   const [type, setType] = useState(NODE_TYPES[0]);
   const [parentId, setParentId] = useState('');
   const [childId, setChildId] = useState('');
+  const [command, setCommand] = useState('');
   const [error, setError] = useState('');
 
   const selectableNodes = nodes.filter((n) => n.id !== 'end');
   const childNodes = nodes.filter((n) => n.id !== 'start');
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => setCommand(evt.target.result);
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -28,11 +38,12 @@ function NodeForm({ nodes, onAddNode }) {
       return;
     }
     setError('');
-    onAddNode({ label: label.trim(), type, parentId, childId });
+    onAddNode({ label: label.trim(), type, parentId, childId, command: command.trim() });
     setLabel('');
     setType(NODE_TYPES[0]);
     setParentId('');
     setChildId('');
+    setCommand('');
   };
 
   return (
@@ -89,6 +100,21 @@ function NodeForm({ nodes, onAddNode }) {
             <option key={n.id} value={n.id}>{n.data.label}</option>
           ))}
         </select>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Command / Script</label>
+        <textarea
+          className={styles.textarea}
+          placeholder="echo 'hello world'"
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          rows={4}
+        />
+        <label className={styles.fileLabel}>
+          Upload .sh file
+          <input type="file" accept=".sh,.bash,.txt" onChange={handleFileUpload} hidden />
+        </label>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}

@@ -6,7 +6,8 @@ type Node struct {
 }
 
 type NodeData struct {
-	Label string `json:"label"`
+	Label   string `json:"label"`
+	Command string `json:"command"`
 }
 
 type Edge struct {
@@ -24,6 +25,7 @@ type TaskLog struct {
 	NodeID string `json:"node_id"`
 	Label  string `json:"label"`
 	Status string `json:"status"`
+	Output string `json:"output,omitempty"`
 }
 
 type WorkflowResponse struct {
