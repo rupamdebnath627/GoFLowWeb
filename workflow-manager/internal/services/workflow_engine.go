@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"GoFlowWeb/internal/models"
@@ -13,8 +12,6 @@ type WorkflowEngine struct {
 	children map[string][]string // adjacency list
 	indegree map[string]int      // dependency counter
 	logs     []models.TaskLog    // execution logs
-	mu       sync.Mutex
-	wg       sync.WaitGroup
 }
 
 func NewWorkflowEngine() *WorkflowEngine {
@@ -38,40 +35,45 @@ func (we *WorkflowEngine) AddDependency(from string, to string) {
 }
 
 func (we *WorkflowEngine) Execute() []models.TaskLog {
-	we.wg.Add(len(we.labels))
+	totalTasks := len(we.labels)
+	completedTasks := 0
+	doneCh := make(chan string, totalTasks)
+
+	fmt.Println("--- Starting Workflow Engine ---")
 
 	for nodeID, count := range we.indegree {
 		if count == 0 {
-			go we.runTask(nodeID)
+			go we.runTask(nodeID, doneCh)
 		}
 	}
 
-	we.wg.Wait()
+	for completedTasks < totalTasks {
+		completedNodeID := <-doneCh
+		completedTasks++
+
+		we.logs = append(we.logs, models.TaskLog{
+			NodeID: completedNodeID,
+			Label:  we.labels[completedNodeID],
+			Status: "completed",
+		})
+
+		for _, childID := range we.children[completedNodeID] {
+			we.indegree[childID]--
+			if we.indegree[childID] == 0 {
+				go we.runTask(childID, doneCh)
+			}
+		}
+	}
+
+	fmt.Println("--- Workflow Complete ---")
 	return we.logs
 }
 
-func (we *WorkflowEngine) runTask(nodeID string) {
-	defer we.wg.Done()
-
+func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- string) {
 	label := we.labels[nodeID]
 	fmt.Printf("[%s] Executing: %s\n", nodeID, label)
-
 	time.Sleep(1 * time.Second)
-
-	we.mu.Lock()
-	we.logs = append(we.logs, models.TaskLog{
-		NodeID: nodeID,
-		Label:  label,
-		Status: "completed",
-	})
-
-	for _, childID := range we.children[nodeID] {
-		we.indegree[childID]--
-		if we.indegree[childID] == 0 {
-			go we.runTask(childID)
-		}
-	}
-	we.mu.Unlock()
+	doneCh <- nodeID
 }
 
 func ExecuteWorkflow(nodes []models.Node, edges []models.Edge) []models.TaskLog {
