@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import WorkflowCanvas from './features/workflow/WorkflowCanvas';
 import StatusBar from './features/workflow/StatusBar';
+import ExecutionResult from './features/workflow/ExecutionResult';
 import { validateWorkflow } from './features/workflow/validateGraph';
 
 function App() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
+  const [execResult, setExecResult] = useState(null);
 
   const handleValidation = ({ nodes, edges }) => {
     const errors = validateWorkflow(nodes, edges);
@@ -15,15 +17,18 @@ function App() {
 
   const handleExecute = async ({ nodes, edges }) => {
     setError('');
+    setExecResult(null);
+    setStatus('Executing workflow...');
 
     const errors = validateWorkflow(nodes, edges);
     if (errors.length > 0) {
       setError(errors.join(' | '));
+      setStatus('');
       return;
     }
 
     const payload = {
-      nodes: nodes.map(({ id, data }) => ({ id, data: { label: data.label, command: data.command || '' } })),
+      nodes: nodes.map(({ id, data }) => ({ id, data: { label: data.label, command: data.command || '', optional: data.optional || false } })),
       edges: edges.map(({ id, source, target }) => ({ id, source, target })),
     };
 
@@ -37,14 +42,17 @@ function App() {
       if (!response.ok) {
         const result = await response.json();
         setError(result.error || `HTTP error: ${response.status}`);
+        setStatus('');
         return;
       }
 
       const result = await response.json();
-      setStatus(result.message);
+      setStatus('');
+      setExecResult(result);
     } catch (err) {
       console.error("Error executing workflow:", err);
-      setStatus("Failed to connect to backend.");
+      setError("Failed to connect to backend.");
+      setStatus('');
     }
   };
 
@@ -52,6 +60,9 @@ function App() {
     <>
       <WorkflowCanvas onExecute={handleExecute} onGraphChange={handleValidation} />
       <StatusBar error={error} warning={warning} status={status} onDismissError={() => setError('')} onDismissWarning={() => setWarning('')} />
+      {execResult && (
+        <ExecutionResult result={execResult} onClose={() => setExecResult(null)} />
+      )}
     </>
   );
 }

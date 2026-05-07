@@ -74,6 +74,24 @@
   background-color: #282c34;
 }
 
+.checkboxField {
+  display: flex;
+  align-items: center;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.checkboxLabel input {
+  accent-color: #61dafb;
+}
+
 .error {
   margin: 0;
   font-size: 12px;

@@ -18,8 +18,11 @@ type taskResult struct {
 type WorkflowEngine struct {
 	labels   map[string]string   // NodeID -> label
 	commands map[string]string   // NodeID -> command
+	optional map[string]bool     // NodeID -> is optional
 	children map[string][]string // adjacency list
+	parents  map[string][]string // reverse adjacency
 	indegree map[string]int      // dependency counter
+	failed   map[string]bool     // NodeID -> has failed (non-optional)
 	mu       sync.Mutex
 	logs     []models.TaskLog
 }
@@ -28,14 +31,18 @@ func NewWorkflowEngine() *WorkflowEngine {
 	return &WorkflowEngine{
 		labels:   make(map[string]string),
 		commands: make(map[string]string),
+		optional: make(map[string]bool),
 		children: make(map[string][]string),
+		parents:  make(map[string][]string),
 		indegree: make(map[string]int),
+		failed:   make(map[string]bool),
 	}
 }
 
-func (we *WorkflowEngine) AddTask(id, label, command string) {
+func (we *WorkflowEngine) AddTask(id, label, command string, optional bool) {
 	we.labels[id] = label
 	we.commands[id] = command
+	we.optional[id] = optional
 	if _, exists := we.indegree[id]; !exists {
 		we.indegree[id] = 0
 	}
@@ -43,7 +50,18 @@ func (we *WorkflowEngine) AddTask(id, label, command string) {
 
 func (we *WorkflowEngine) AddDependency(from, to string) {
 	we.children[from] = append(we.children[from], to)
+	we.parents[to] = append(we.parents[to], from)
 	we.indegree[to]++
+}
+
+// shouldSkip checks if a node has any non-optional parent that failed.
+func (we *WorkflowEngine) shouldSkip(nodeID string) bool {
+	for _, parentID := range we.parents[nodeID] {
+		if we.failed[parentID] && !we.optional[parentID] {
+			return true
+		}
+	}
+	return false
 }
 
 func (we *WorkflowEngine) Execute() []models.TaskLog {
@@ -58,7 +76,11 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 		if cmd == "" {
 			cmd = "(no command)"
 		}
-		fmt.Printf("  %s: %s (indegree=%d) cmd=%q\n", id, label, we.indegree[id], cmd)
+		opt := ""
+		if we.optional[id] {
+			opt = " [optional]"
+		}
+		fmt.Printf("  %s: %s (indegree=%d)%s cmd=%q\n", id, label, we.indegree[id], opt, cmd)
 	}
 	fmt.Println("Edges:")
 	for parent, kids := range we.children {
@@ -81,8 +103,14 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 
 			status := "completed"
 			if result.err != nil {
-				status = "failed"
-				fmt.Printf("[%s] Failed (%d/%d): %v\n", result.nodeID, completedTasks, totalTasks, result.err)
+				if we.optional[result.nodeID] {
+					status = "failed (optional)"
+					fmt.Printf("[%s] Failed (optional) (%d/%d): %v\n", result.nodeID, completedTasks, totalTasks, result.err)
+				} else {
+					status = "failed"
+					we.failed[result.nodeID] = true
+					fmt.Printf("[%s] Failed (%d/%d): %v\n", result.nodeID, completedTasks, totalTasks, result.err)
+				}
 			} else {
 				fmt.Printf("[%s] Completed (%d/%d)\n", result.nodeID, completedTasks, totalTasks)
 			}
@@ -99,7 +127,18 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 			for _, childID := range we.children[result.nodeID] {
 				we.indegree[childID]--
 				if we.indegree[childID] == 0 {
-					go we.runTask(childID, doneCh)
+					if we.shouldSkip(childID) {
+						// A required parent failed — skip this node and propagate
+						we.failed[childID] = true
+						fmt.Printf("[%s] Skipped (parent failed)\n", childID)
+						doneCh <- taskResult{
+							nodeID: childID,
+							output: "skipped: a required parent task failed",
+							err:    fmt.Errorf("skipped: a required parent task failed"),
+						}
+					} else {
+						go we.runTask(childID, doneCh)
+					}
 				}
 			}
 		case <-timeout:
@@ -155,7 +194,7 @@ func ExecuteWorkflow(nodes []models.Node, edges []models.Edge) []models.TaskLog 
 	engine := NewWorkflowEngine()
 
 	for _, node := range nodes {
-		engine.AddTask(node.ID, node.Data.Label, node.Data.Command)
+		engine.AddTask(node.ID, node.Data.Label, node.Data.Command, node.Data.Optional)
 	}
 
 	for _, edge := range edges {

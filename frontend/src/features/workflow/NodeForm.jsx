@@ -9,6 +9,7 @@ function NodeForm({ nodes, onAddNode }) {
   const [parentId, setParentId] = useState('');
   const [childId, setChildId] = useState('');
   const [command, setCommand] = useState('');
+  const [optional, setOptional] = useState(false);
   const [error, setError] = useState('');
 
   const selectableNodes = nodes.filter((n) => n.id !== 'end');
@@ -38,12 +39,13 @@ function NodeForm({ nodes, onAddNode }) {
       return;
     }
     setError('');
-    onAddNode({ label: label.trim(), type, parentId, childId, command: command.trim() });
+    onAddNode({ label: label.trim(), type, parentId, childId, command: command.trim(), optional });
     setLabel('');
     setType(NODE_TYPES[0]);
     setParentId('');
     setChildId('');
     setCommand('');
+    setOptional(false);
   };
 
   return (
@@ -114,6 +116,17 @@ function NodeForm({ nodes, onAddNode }) {
         <label className={styles.fileLabel}>
           Upload .sh file
           <input type="file" accept=".sh,.bash,.txt" onChange={handleFileUpload} hidden />
+        </label>
+      </div>
+
+      <div className={styles.checkboxField}>
+        <label className={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={optional}
+            onChange={(e) => setOptional(e.target.checked)}
+          />
+          Optional (continues on failure)
         </label>
       </div>
 

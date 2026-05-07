@@ -171,7 +171,7 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
     []
   );
 
-  const handleAddNode = ({ label, type, parentId, childId, command }) => {
+  const handleAddNode = ({ label, type, parentId, childId, command, optional }) => {
     const newId = `node-${nodeCounterRef.current}`;
     nodeCounterRef.current += 1;
 
@@ -179,7 +179,7 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
       id: newId,
       position: { x: 0, y: 0 },
       type: 'custom',
-      data: { label: `${label} (${type})`, command: command || '' },
+      data: { label: `${label} (${type})`, command: command || '', optional: optional || false },
     };
 
     const updatedEdges = [

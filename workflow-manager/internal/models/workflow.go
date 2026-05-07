@@ -6,8 +6,9 @@ type Node struct {
 }
 
 type NodeData struct {
-	Label   string `json:"label"`
-	Command string `json:"command"`
+	Label    string `json:"label"`
+	Command  string `json:"command"`
+	Optional bool   `json:"optional"`
 }
 
 type Edge struct {
