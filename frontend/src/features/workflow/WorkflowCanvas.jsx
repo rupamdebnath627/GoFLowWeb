@@ -3,6 +3,7 @@ import ReactFlow, {
   addEdge,
   applyNodeChanges,
   applyEdgeChanges,
+  ConnectionLineType,
   Background,
   Controls
 } from 'reactflow';
@@ -166,7 +167,7 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
   }, []);
 
   const onConnect = useCallback(
-    (connection) => setEdges((eds) => addEdge(connection, eds)),
+    (connection) => setEdges((eds) => addEdge({ ...connection, type: 'smoothstep', markerEnd: { type: 'arrowclosed', width: 15, height: 15 } }, eds)),
     []
   );
 
@@ -223,6 +224,7 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            connectionLineType={ConnectionLineType.SmoothStep}
             fitView
           >
             <Background />
