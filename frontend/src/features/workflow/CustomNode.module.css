@@ -7,8 +7,3 @@
   text-align: center;
   min-width: 120px;
 }
-
-.hiddenHandle {
-  opacity: 0;
-  pointer-events: none;
-}

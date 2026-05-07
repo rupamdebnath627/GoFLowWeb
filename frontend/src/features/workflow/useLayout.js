@@ -31,28 +31,13 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
     };
   });
 
-  // Assign source/target handles based on relative positions of connected nodes
   const layoutedEdges = edges.map((edge) => {
-    const sourcePos = nodePositions[edge.source];
-    const targetPos = nodePositions[edge.target];
-
-    let sourceHandle = 'bottom';
-    let targetHandle = 'top';
-
-    if (direction === 'TB' && sourcePos && targetPos) {
-      // If the target is far to the right/left, use side handles to reduce crossings
-      const dx = targetPos.x - sourcePos.x;
-      if (Math.abs(dx) > NODE_WIDTH) {
-        sourceHandle = dx > 0 ? 'right' : 'left';
-        targetHandle = dx > 0 ? 'left' : 'right';
-      }
-    }
-
     return {
       ...edge,
       type: 'smoothstep',
-      sourceHandle,
-      targetHandle,
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      markerEnd: { type: 'arrowclosed', width: 15, height: 15 },
     };
   });
 

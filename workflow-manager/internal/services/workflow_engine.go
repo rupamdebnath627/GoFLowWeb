@@ -40,6 +40,16 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 	doneCh := make(chan string, totalTasks)
 
 	fmt.Println("--- Starting Workflow Engine ---")
+	fmt.Println("Nodes:")
+	for id, label := range we.labels {
+		fmt.Printf("  %s: %s (indegree=%d)\n", id, label, we.indegree[id])
+	}
+	fmt.Println("Edges:")
+	for parent, kids := range we.children {
+		for _, kid := range kids {
+			fmt.Printf("  %s -> %s\n", parent, kid)
+		}
+	}
 
 	for nodeID, count := range we.indegree {
 		if count == 0 {
@@ -47,21 +57,39 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 		}
 	}
 
+	timeout := time.After(time.Duration(totalTasks*2+10) * time.Second)
 	for completedTasks < totalTasks {
-		completedNodeID := <-doneCh
-		completedTasks++
+		select {
+		case completedNodeID := <-doneCh:
+			completedTasks++
+			fmt.Printf("[%s] Completed (%d/%d)\n", completedNodeID, completedTasks, totalTasks)
 
-		we.logs = append(we.logs, models.TaskLog{
-			NodeID: completedNodeID,
-			Label:  we.labels[completedNodeID],
-			Status: "completed",
-		})
+			we.logs = append(we.logs, models.TaskLog{
+				NodeID: completedNodeID,
+				Label:  we.labels[completedNodeID],
+				Status: "completed",
+			})
 
-		for _, childID := range we.children[completedNodeID] {
-			we.indegree[childID]--
-			if we.indegree[childID] == 0 {
-				go we.runTask(childID, doneCh)
+			for _, childID := range we.children[completedNodeID] {
+				we.indegree[childID]--
+				if we.indegree[childID] == 0 {
+					go we.runTask(childID, doneCh)
+				}
 			}
+		case <-timeout:
+			fmt.Printf("--- Workflow TIMEOUT: completed %d/%d tasks ---\n", completedTasks, totalTasks)
+			fmt.Println("Stuck nodes (indegree > 0):")
+			for id, deg := range we.indegree {
+				if deg > 0 {
+					fmt.Printf("  %s: %s (indegree=%d)\n", id, we.labels[id], deg)
+				}
+			}
+			we.logs = append(we.logs, models.TaskLog{
+				NodeID: "engine",
+				Label:  "Workflow timed out - possible cycle or missing edges",
+				Status: "error",
+			})
+			return we.logs
 		}
 	}
 
