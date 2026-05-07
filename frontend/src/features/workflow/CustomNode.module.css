@@ -7,3 +7,15 @@
   text-align: center;
   min-width: 120px;
 }
+
+.targetHandle {
+  background: #2196f3 !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.sourceHandle {
+  background: #ff9800 !important;
+  width: 8px !important;
+  height: 8px !important;
+}
