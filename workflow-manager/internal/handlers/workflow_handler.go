@@ -3,12 +3,18 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"GoFlowWeb/internal/models"
 	"GoFlowWeb/internal/services"
+	"GoFlowWeb/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
+
+func joinCycle(cycle []string) string {
+	return strings.Join(cycle, " → ")
+}
 
 func ExecuteWorkflow(c *gin.Context) {
 	var req models.WorkflowRequest
@@ -19,6 +25,13 @@ func ExecuteWorkflow(c *gin.Context) {
 
 	if len(req.Nodes) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow must have at least one node"})
+		return
+	}
+
+	if cycle := utils.FindCycle(req.Nodes, req.Edges); cycle != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("circular dependency detected: %s", joinCycle(cycle)),
+		})
 		return
 	}
 
