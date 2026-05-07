@@ -1,10 +1,21 @@
 import { useState } from 'react';
 import WorkflowCanvas from './features/workflow/WorkflowCanvas';
+import StatusBar from './features/workflow/StatusBar';
+import { findCycle } from './features/workflow/findCycle';
 
 function App() {
   const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
 
   const handleExecute = async ({ nodes, edges }) => {
+    setError('');
+
+    const cycle = findCycle(nodes, edges);
+    if (cycle) {
+      setError(`Circular dependency detected: ${cycle.join(' → ')}`);
+      return;
+    }
+
     const payload = {
       nodes: nodes.map(({ id, data }) => ({ id, data: { label: data.label } })),
       edges: edges.map(({ id, source, target }) => ({ id, source, target })),
@@ -32,11 +43,7 @@ function App() {
   return (
     <>
       <WorkflowCanvas onExecute={handleExecute} />
-      {status && (
-        <div style={{ position: 'fixed', bottom: '16px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#282c34', color: 'white', padding: '8px 16px', borderRadius: '4px' }}>
-          {status}
-        </div>
-      )}
+      <StatusBar error={error} status={status} onDismissError={() => setError('')} />
     </>
   );
 }

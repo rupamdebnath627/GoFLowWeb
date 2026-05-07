@@ -32,11 +32,36 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
   });
 
   const layoutedEdges = edges.map((edge) => {
+    const sourcePos = nodePositions[edge.source];
+    const targetPos = nodePositions[edge.target];
+
+    let sourceHandle = 'source-bottom';
+    let targetHandle = 'target-top';
+
+    if (sourcePos && targetPos) {
+      const dx = targetPos.x - sourcePos.x;
+      const dy = targetPos.y - sourcePos.y;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Primarily horizontal
+        sourceHandle = dx > 0 ? 'source-right' : 'source-left';
+        targetHandle = dx > 0 ? 'target-left' : 'target-right';
+      } else if (dy > 0) {
+        // Target is below source (normal top-to-bottom flow)
+        sourceHandle = 'source-bottom';
+        targetHandle = 'target-top';
+      } else {
+        // Target is above source (back-edge / upward)
+        sourceHandle = 'source-top';
+        targetHandle = 'target-bottom';
+      }
+    }
+
     return {
       ...edge,
       type: 'smoothstep',
-      sourceHandle: 'bottom',
-      targetHandle: 'top',
+      sourceHandle,
+      targetHandle,
       markerEnd: { type: 'arrowclosed', width: 15, height: 15 },
     };
   });
