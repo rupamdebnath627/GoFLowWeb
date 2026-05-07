@@ -12,10 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func joinCycle(cycle []string) string {
-	return strings.Join(cycle, " → ")
-}
-
 func ExecuteWorkflow(c *gin.Context) {
 	var req models.WorkflowRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -28,9 +24,9 @@ func ExecuteWorkflow(c *gin.Context) {
 		return
 	}
 
-	if cycle := utils.FindCycle(req.Nodes, req.Edges); cycle != nil {
+	if errs := utils.ValidateWorkflow(req.Nodes, req.Edges); len(errs) > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("circular dependency detected: %s", joinCycle(cycle)),
+			"error": strings.Join(errs, " | "),
 		})
 		return
 	}

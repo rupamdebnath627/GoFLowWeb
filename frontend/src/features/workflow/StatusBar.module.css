@@ -14,6 +14,22 @@
   gap: 12px;
 }
 
+.warning {
+  position: fixed;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #ed6c02;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  z-index: 1000;
+  max-width: 80vw;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .closeBtn {
   background: none;
   border: none;

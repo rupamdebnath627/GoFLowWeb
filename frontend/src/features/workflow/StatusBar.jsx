@@ -1,12 +1,18 @@
 import styles from './StatusBar.module.css';
 
-function StatusBar({ error, status, onDismissError }) {
+function StatusBar({ error, warning, status, onDismissError, onDismissWarning }) {
   return (
     <>
       {error && (
         <div className={styles.error}>
           <span>{error}</span>
           <button onClick={onDismissError} className={styles.closeBtn}>&times;</button>
+        </div>
+      )}
+      {!error && warning && (
+        <div className={styles.warning}>
+          <span>{warning}</span>
+          <button onClick={onDismissWarning} className={styles.closeBtn}>&times;</button>
         </div>
       )}
       {status && (

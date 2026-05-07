@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import WorkflowCanvas from './features/workflow/WorkflowCanvas';
 import StatusBar from './features/workflow/StatusBar';
-import { findCycle } from './features/workflow/findCycle';
+import { validateWorkflow } from './features/workflow/validateGraph';
 
 function App() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
+
+  const handleValidation = ({ nodes, edges }) => {
+    const errors = validateWorkflow(nodes, edges);
+    setWarning(errors.length > 0 ? errors.join(' | ') : '');
+  };
 
   const handleExecute = async ({ nodes, edges }) => {
     setError('');
 
-    const cycle = findCycle(nodes, edges);
-    if (cycle) {
-      setError(`Circular dependency detected: ${cycle.join(' → ')}`);
+    const errors = validateWorkflow(nodes, edges);
+    if (errors.length > 0) {
+      setError(errors.join(' | '));
       return;
     }
 
@@ -29,7 +35,9 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        setError(result.error || `HTTP error: ${response.status}`);
+        return;
       }
 
       const result = await response.json();
@@ -42,8 +50,8 @@ function App() {
 
   return (
     <>
-      <WorkflowCanvas onExecute={handleExecute} />
-      <StatusBar error={error} status={status} onDismissError={() => setError('')} />
+      <WorkflowCanvas onExecute={handleExecute} onGraphChange={handleValidation} />
+      <StatusBar error={error} warning={warning} status={status} onDismissError={() => setError('')} onDismissWarning={() => setWarning('')} />
     </>
   );
 }
