@@ -119,8 +119,10 @@ export default function useWorkflowExecution() {
     if (!id) return;
 
     try {
-      await fetch(`${API_BASE}/cancel/${id}`, { method: 'POST' });
-      setStatus('Cancelling workflow...');
+      const res = await fetch(`${API_BASE}/cancel/${id}`, { method: 'POST' });
+      if (!res.ok) {
+        setError('Failed to cancel workflow.');
+      }
     } catch (err) {
       console.error('Error cancelling workflow:', err);
       setError('Failed to cancel workflow.');
