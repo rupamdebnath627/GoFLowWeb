@@ -1,29 +1,6 @@
 import { Handle, Position } from 'reactflow';
+import { STATUS_CLASS, STATUS_ICON } from '../constants/statusConfig';
 import styles from './styles/CustomNode.module.css';
-
-const STATUS_CLASS = {
-  pending: 'statusPending',
-  running: 'statusRunning',
-  paused: 'statusPaused',
-  completed: 'statusCompleted',
-  failed: 'statusFailed',
-  'failed (optional)': 'statusFailedOptional',
-  skipped: 'statusSkipped',
-  cancelled: 'statusCancelled',
-  error: 'statusFailed',
-};
-
-const STATUS_ICON = {
-  pending: '\u25CB',
-  running: '\u25F7',
-  paused: '\u275A\u275A',
-  completed: '\u2713',
-  failed: '\u2717',
-  'failed (optional)': '\u26A0',
-  skipped: '\u2192',
-  cancelled: '\u2715',
-  error: '\u2717',
-};
 
 function CustomNode({ data }) {
   const execStatus = data.execStatus;

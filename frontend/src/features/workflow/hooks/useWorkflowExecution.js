@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { validateWorkflow } from '../utils/validateGraph';
 
 const API_BASE = 'http://localhost:8080';
@@ -12,6 +12,17 @@ export default function useWorkflowExecution() {
   const [isPaused, setIsPaused] = useState(false);
   const execResultRef = useRef(null);
   const workflowIdRef = useRef(null);
+  const wsRef = useRef(null);
+
+  // Clean up WebSocket on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, []);
 
   const execute = async ({ nodes, edges }) => {
     setError('');
@@ -42,8 +53,12 @@ export default function useWorkflowExecution() {
       });
 
       if (!response.ok) {
-        const result = await response.json();
-        setError(result.error || `HTTP error: ${response.status}`);
+        let msg = `HTTP error: ${response.status}`;
+        try {
+          const result = await response.json();
+          msg = result.error || msg;
+        } catch { /* non-JSON response */ }
+        setError(msg);
         setStatus('');
         return;
       }
@@ -53,7 +68,13 @@ export default function useWorkflowExecution() {
       setIsRunning(true);
       setStatus(`Workflow submitted (${workflow_id}). Connecting...`);
 
+      // Close any prior WebSocket before opening a new one
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+
       const ws = new WebSocket(`ws://${location.hostname}:8080/ws/${workflow_id}`);
+      wsRef.current = ws;
       const logs = [];
 
       ws.onopen = () => {
@@ -79,8 +100,11 @@ export default function useWorkflowExecution() {
             setIsPaused(true);
             setStatus(`Workflow paused (${workflow_id})`);
           } else if (msg.log.status !== 'running') {
-            logs.push(msg.log);
-            setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
+            const skip = msg.log.node_id === 'start' || msg.log.node_id === 'end' || msg.log.node_id === 'engine';
+            if (!skip) {
+              logs.push(msg.log);
+              setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
+            }
           }
         }
 
@@ -89,6 +113,7 @@ export default function useWorkflowExecution() {
           setIsRunning(false);
           setIsPaused(false);
           workflowIdRef.current = null;
+          wsRef.current = null;
           const result = {
             status: msg.status,
             message: msg.message,
@@ -105,6 +130,7 @@ export default function useWorkflowExecution() {
         setStatus('');
         setIsRunning(false);
         setIsPaused(false);
+        wsRef.current = null;
       };
 
       ws.onclose = (event) => {
@@ -113,6 +139,7 @@ export default function useWorkflowExecution() {
           setIsRunning(false);
           setIsPaused(false);
         }
+        wsRef.current = null;
       };
     } catch (err) {
       console.error('Error executing workflow:', err);

@@ -38,6 +38,10 @@ function NodeForm({ nodes, onAddNode }) {
       setError('Parent and child must be different nodes.');
       return;
     }
+    if (!command.trim()) {
+      setError('Command / script is required.');
+      return;
+    }
     setError('');
     onAddNode({ label: label.trim(), type, parentId, childId, command: command.trim(), optional });
     setLabel('');

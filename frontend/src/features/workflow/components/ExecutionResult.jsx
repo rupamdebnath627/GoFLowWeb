@@ -1,13 +1,5 @@
+import { STATUS_ICON } from '../constants/statusConfig';
 import styles from './styles/ExecutionResult.module.css';
-
-const STATUS_ICONS = {
-  completed: '\u2713',
-  failed: '\u2717',
-  'failed (optional)': '\u26A0',
-  skipped: '\u2192',
-  cancelled: '\u2715',
-  error: '\u2717',
-};
 
 const TITLE_MAP = {
   success: { text: 'Workflow Completed', className: 'titleSuccess' },
@@ -34,7 +26,7 @@ function ExecutionResult({ result, onClose }) {
           {result.logs.map((log, i) => (
             <div key={i} className={`${styles.logEntry} ${styles[`log_${log.status.replace(/[^a-z]/g, '_')}`] || ''}`}>
               <div className={styles.logHeader}>
-                <span className={styles.logIcon}>{STATUS_ICONS[log.status] || '?'}</span>
+                <span className={styles.logIcon}>{STATUS_ICON[log.status] || '?'}</span>
                 <span className={styles.logLabel}>{log.label}</span>
                 <span className={`${styles.logStatus} ${log.status === 'completed' ? styles.statusOk : log.status === 'cancelled' ? styles.statusCancelled : styles.statusFail}`}>
                   {log.status}

@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"sync/atomic"
+	"sync"
 	"syscall"
 
 	"GoFlowWeb/internal/models"
@@ -26,7 +26,8 @@ type WorkflowEngine struct {
 	indegree map[string]int
 	failed   map[string]bool
 
-	paused        atomic.Bool
+	pauseMu       sync.Mutex
+	paused        bool
 	pauseCh       chan struct{} // closed when resumed, recreated on pause
 	pauseNotifyCh chan struct{} // signals Execute loop that pause was requested
 }
@@ -70,51 +71,97 @@ func (we *WorkflowEngine) shouldSkip(nodeID string) bool {
 }
 
 func (we *WorkflowEngine) Pause() {
-	if we.paused.CompareAndSwap(false, true) {
-		we.pauseCh = make(chan struct{})
-		// Notify the Execute loop
-		select {
-		case we.pauseNotifyCh <- struct{}{}:
-		default:
-		}
+	we.pauseMu.Lock()
+	defer we.pauseMu.Unlock()
+	if we.paused {
+		return
+	}
+	we.paused = true
+	we.pauseCh = make(chan struct{})
+	select {
+	case we.pauseNotifyCh <- struct{}{}:
+	default:
 	}
 }
 
 func (we *WorkflowEngine) Resume() {
-	if we.paused.CompareAndSwap(true, false) {
-		close(we.pauseCh)
+	we.pauseMu.Lock()
+	defer we.pauseMu.Unlock()
+	if !we.paused {
+		return
 	}
+	we.paused = false
+	close(we.pauseCh)
+}
+
+// getPauseState returns the current pause flag and the channel to wait on.
+// Must be used together to avoid reading a stale channel.
+func (we *WorkflowEngine) getPauseState() (bool, chan struct{}) {
+	we.pauseMu.Lock()
+	defer we.pauseMu.Unlock()
+	return we.paused, we.pauseCh
 }
 
 func (we *WorkflowEngine) waitIfPaused(ctx context.Context) bool {
-	if !we.paused.Load() {
+	paused, ch := we.getPauseState()
+	if !paused {
 		return false
 	}
 	select {
-	case <-we.pauseCh:
+	case <-ch:
 		return false
 	case <-ctx.Done():
 		return true
 	}
 }
 
-func (we *WorkflowEngine) dispatchChild(ctx context.Context, childID string, eventCh chan<- models.TaskLog, doneCh chan taskResult) bool {
-	if we.paused.Load() && childID != "start" && childID != "end" {
+// dispatchReady sends "paused" events for all pausable nodes, waits for resume,
+// then launches all of them. Returns true if cancelled while waiting.
+func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, eventCh chan<- models.TaskLog, doneCh chan taskResult) bool {
+	paused, _ := we.getPauseState()
+
+	// Separate pausable vs non-pausable (start/end always run immediately)
+	var pausable, immediate []string
+	for _, id := range readyIDs {
+		if paused && id != "start" && id != "end" {
+			pausable = append(pausable, id)
+		} else {
+			immediate = append(immediate, id)
+		}
+	}
+
+	// Launch non-pausable nodes right away
+	for _, id := range immediate {
 		eventCh <- models.TaskLog{
-			NodeID: childID,
-			Label:  we.labels[childID],
-			Status: "paused",
+			NodeID: id,
+			Label:  we.labels[id],
+			Status: "running",
+		}
+		go we.runTask(ctx, id, doneCh)
+	}
+
+	// If there are pausable nodes, mark them all as paused, wait once, then launch all
+	if len(pausable) > 0 {
+		for _, id := range pausable {
+			eventCh <- models.TaskLog{
+				NodeID: id,
+				Label:  we.labels[id],
+				Status: "paused",
+			}
 		}
 		if we.waitIfPaused(ctx) {
 			return true
 		}
+		for _, id := range pausable {
+			eventCh <- models.TaskLog{
+				NodeID: id,
+				Label:  we.labels[id],
+				Status: "running",
+			}
+			go we.runTask(ctx, id, doneCh)
+		}
 	}
-	eventCh <- models.TaskLog{
-		NodeID: childID,
-		Label:  we.labels[childID],
-		Status: "running",
-	}
-	go we.runTask(ctx, childID, doneCh)
+
 	return false
 }
 
@@ -172,7 +219,6 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 			return
 
 		case <-we.pauseNotifyCh:
-			// Pause was requested — send a workflow-level pause event
 			eventCh <- models.TaskLog{
 				NodeID: "engine",
 				Label:  "Workflow paused",
@@ -203,6 +249,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 			fmt.Printf("[%s] %s (%d/%d)\n", result.nodeID, status, completedTasks, totalTasks)
 			eventCh <- log
 
+			var readyToDispatch []string
 			for _, childID := range we.children[result.nodeID] {
 				we.indegree[childID]--
 				if we.indegree[childID] == 0 {
@@ -215,25 +262,27 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 						}
 						runningCount++
 					} else {
-						cancelled := we.dispatchChild(ctx, childID, eventCh, doneCh)
-						if cancelled {
-							for nodeID := range we.labels {
-								if !completed[nodeID] {
-									completedTasks++
-									eventCh <- models.TaskLog{
-										NodeID: nodeID,
-										Label:  we.labels[nodeID],
-										Status: "cancelled",
-										Output: "cancelled before execution",
-									}
-									completed[nodeID] = true
-								}
-							}
-							return
-						}
-						runningCount++
+						readyToDispatch = append(readyToDispatch, childID)
 					}
 				}
+			}
+			if len(readyToDispatch) > 0 {
+				if we.dispatchReady(ctx, readyToDispatch, eventCh, doneCh) {
+					for nodeID := range we.labels {
+						if !completed[nodeID] {
+							completedTasks++
+							eventCh <- models.TaskLog{
+								NodeID: nodeID,
+								Label:  we.labels[nodeID],
+								Status: "cancelled",
+								Output: "cancelled before execution",
+							}
+							completed[nodeID] = true
+						}
+					}
+					return
+				}
+				runningCount += len(readyToDispatch)
 			}
 		}
 	}

@@ -6,6 +6,7 @@ import NodeForm from './NodeForm';
 import CustomNode from './CustomNode';
 import ConfirmDialog from './ConfirmDialog';
 import NodeDetailPanel from './NodeDetailPanel';
+import WorkflowToolbar from './WorkflowToolbar';
 
 function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunning, isPaused, nodeStatuses }) {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
@@ -24,7 +25,6 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
     handleCancelDelete,
   } = graph;
 
-  // Inject execution status into each node's data so CustomNode can render it
   const nodesWithStatus = useMemo(() => {
     if (!nodeStatuses || Object.keys(nodeStatuses).length === 0) return nodes;
     return nodes.map((node) => {
@@ -49,31 +49,14 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
       <NodeForm nodes={nodes} onAddNode={handleAddNode} />
 
       <div className={styles.main}>
-        <div className={styles.toolbar}>
-          <button
-            onClick={() => onExecute({ nodes, edges })}
-            className={styles.executeBtn}
-            disabled={isRunning}
-          >
-            Execute Workflow
-          </button>
-          {isRunning && (
-            <>
-              {isPaused ? (
-                <button onClick={onResume} className={styles.resumeBtn}>
-                  Resume Workflow
-                </button>
-              ) : (
-                <button onClick={onPause} className={styles.pauseBtn}>
-                  Pause Workflow
-                </button>
-              )}
-              <button onClick={onCancel} className={styles.cancelBtn}>
-                Cancel Workflow
-              </button>
-            </>
-          )}
-        </div>
+        <WorkflowToolbar
+          onExecute={() => onExecute({ nodes, edges })}
+          onCancel={onCancel}
+          onPause={onPause}
+          onResume={onResume}
+          isRunning={isRunning}
+          isPaused={isPaused}
+        />
 
         <div className={styles.canvas}>
           <ReactFlow

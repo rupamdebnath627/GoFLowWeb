@@ -1,37 +1,28 @@
 import { useState } from 'react';
+import { STATUS_ICON, STATUS_CLASS, STATUS_LABEL } from '../constants/statusConfig';
 import styles from './styles/NodeDetailPanel.module.css';
-
-const STATUS_CONFIG = {
-  idle: { icon: '\u25CB', label: 'Not executed', className: 'statusIdle' },
-  pending: { icon: '\u25CB', label: 'Pending', className: 'statusIdle' },
-  paused: { icon: '\u275A\u275A', label: 'Paused', className: 'statusPaused' },
-  running: { icon: '\u25F7', label: 'Running...', className: 'statusRunning' },
-  completed: { icon: '\u2713', label: 'Completed', className: 'statusCompleted' },
-  failed: { icon: '\u2717', label: 'Failed', className: 'statusFailed' },
-  'failed (optional)': { icon: '\u26A0', label: 'Failed (optional)', className: 'statusFailed' },
-  skipped: { icon: '\u2192', label: 'Skipped', className: 'statusSkipped' },
-  cancelled: { icon: '\u2715', label: 'Cancelled', className: 'statusCancelled' },
-  error: { icon: '\u2717', label: 'Error', className: 'statusFailed' },
-};
 
 function NodeDetailPanel({ node, executionStatus, onSave, onClose }) {
   const isFixedNode = node.id === 'start' || node.id === 'end';
   const nodeStatus = executionStatus?.status || 'idle';
   const isEditable = (nodeStatus === 'idle' || nodeStatus === 'pending' || nodeStatus === 'paused') && !isFixedNode;
-  const statusInfo = STATUS_CONFIG[nodeStatus] || STATUS_CONFIG.idle;
 
-  const [label, setLabel] = useState(node.data.label);
+  const icon = STATUS_ICON[nodeStatus] || STATUS_ICON.idle;
+  const className = STATUS_CLASS[nodeStatus] || STATUS_CLASS.idle;
+  const label = STATUS_LABEL[nodeStatus] || STATUS_LABEL.idle;
+
+  const [nodeLabel, setNodeLabel] = useState(node.data.label);
   const [command, setCommand] = useState(node.data.command || '');
   const [optional, setOptional] = useState(node.data.optional || false);
 
   const hasChanges =
-    label !== node.data.label ||
+    nodeLabel !== node.data.label ||
     command !== (node.data.command || '') ||
     optional !== (node.data.optional || false);
 
   const handleSave = () => {
-    if (!label.trim()) return;
-    onSave(node.id, { label: label.trim(), command: command.trim(), optional });
+    if (!nodeLabel.trim()) return;
+    onSave(node.id, { label: nodeLabel.trim(), command: command.trim(), optional });
     onClose();
   };
 
@@ -47,9 +38,9 @@ function NodeDetailPanel({ node, executionStatus, onSave, onClose }) {
         </div>
 
         <div className={styles.statusSection}>
-          <span className={styles.statusIcon}>{statusInfo.icon}</span>
-          <span className={`${styles.statusText} ${styles[statusInfo.className]}`}>
-            {statusInfo.label}
+          <span className={styles.statusIcon}>{icon}</span>
+          <span className={`${styles.statusText} ${styles[className]}`}>
+            {label}
           </span>
         </div>
 
@@ -72,8 +63,8 @@ function NodeDetailPanel({ node, executionStatus, onSave, onClose }) {
               <input
                 className={styles.input}
                 type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
+                value={nodeLabel}
+                onChange={(e) => setNodeLabel(e.target.value)}
                 disabled={!isEditable}
               />
             </div>
