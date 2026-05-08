@@ -1,13 +1,107 @@
 .node {
   padding: 8px 16px;
-  border: 1px solid #333;
+  border: 2px solid #333;
   border-radius: 4px;
   background: #fff;
   font-size: 13px;
   text-align: center;
   min-width: 120px;
+  transition: border-color 0.3s, background-color 0.3s, box-shadow 0.3s;
 }
 
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.statusIcon {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.statusLabel {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Execution status styles */
+.statusPending {
+  border-color: #78909c;
+  background: #eceff1;
+}
+
+.statusPending .statusIcon,
+.statusPending .statusLabel {
+  color: #546e7a;
+}
+
+.statusCompleted {
+  border-color: #4caf50;
+  background: #e8f5e9;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.statusCompleted .statusIcon,
+.statusCompleted .statusLabel {
+  color: #2e7d32;
+}
+
+.statusFailed {
+  border-color: #f44336;
+  background: #ffebee;
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.3);
+}
+
+.statusFailed .statusIcon,
+.statusFailed .statusLabel {
+  color: #c62828;
+}
+
+.statusFailedOptional {
+  border-color: #ff9800;
+  background: #fff3e0;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.3);
+}
+
+.statusFailedOptional .statusIcon,
+.statusFailedOptional .statusLabel {
+  color: #e65100;
+}
+
+.statusSkipped {
+  border-color: #9e9e9e;
+  background: #f5f5f5;
+  box-shadow: 0 0 8px rgba(158, 158, 158, 0.3);
+}
+
+.statusSkipped .statusIcon,
+.statusSkipped .statusLabel {
+  color: #616161;
+}
+
+.statusRunning {
+  border-color: #2196f3;
+  background: #e3f2fd;
+  box-shadow: 0 0 12px rgba(33, 150, 243, 0.4);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.statusRunning .statusIcon,
+.statusRunning .statusLabel {
+  color: #1565c0;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(33, 150, 243, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(33, 150, 243, 0.6); }
+}
+
+/* Handle styles */
 .targetHandle {
   background: #2196f3 !important;
   width: 8px !important;
@@ -20,6 +114,7 @@
   height: 8px !important;
 }
 
+/* Optional node style */
 .optional {
   border-style: dashed;
   border-color: #ff9800;

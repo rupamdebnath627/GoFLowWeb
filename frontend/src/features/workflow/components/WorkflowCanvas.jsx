@@ -9,7 +9,7 @@ import NodeDetailPanel from './NodeDetailPanel';
 
 function WorkflowCanvas({ graph, onExecute, nodeStatuses }) {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
 
   const {
     nodes,
@@ -24,8 +24,20 @@ function WorkflowCanvas({ graph, onExecute, nodeStatuses }) {
     handleCancelDelete,
   } = graph;
 
+  // Inject execution status into each node's data so CustomNode can render it
+  const nodesWithStatus = useMemo(() => {
+    if (!nodeStatuses || Object.keys(nodeStatuses).length === 0) return nodes;
+    return nodes.map((node) => {
+      const execStatus = nodeStatuses[node.id];
+      if (!execStatus) return node;
+      return { ...node, data: { ...node.data, execStatus: execStatus.status, execOutput: execStatus.output } };
+    });
+  }, [nodes, nodeStatuses]);
+
+  const selectedNode = selectedNodeId ? nodesWithStatus.find((n) => n.id === selectedNodeId) : null;
+
   const onNodeClick = useCallback((_event, node) => {
-    setSelectedNode(node);
+    setSelectedNodeId(node.id);
   }, []);
 
   const handleNodeSave = useCallback((nodeId, data) => {
@@ -45,7 +57,7 @@ function WorkflowCanvas({ graph, onExecute, nodeStatuses }) {
 
         <div className={styles.canvas}>
           <ReactFlow
-            nodes={nodes}
+            nodes={nodesWithStatus}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
@@ -75,7 +87,7 @@ function WorkflowCanvas({ graph, onExecute, nodeStatuses }) {
           node={selectedNode}
           executionStatus={nodeStatuses[selectedNode.id]}
           onSave={handleNodeSave}
-          onClose={() => setSelectedNode(null)}
+          onClose={() => setSelectedNodeId(null)}
         />
       )}
     </div>

@@ -50,6 +50,13 @@ export default function useWorkflowExecution() {
       const logs = [];
 
       ws.onopen = () => {
+        const initial = {};
+        for (const node of nodes) {
+          if (node.id !== 'start' && node.id !== 'end') {
+            initial[node.id] = { status: 'pending', output: '' };
+          }
+        }
+        setNodeStatuses(initial);
         setStatus(`Running workflow (${workflow_id})...`);
       };
 
@@ -57,12 +64,14 @@ export default function useWorkflowExecution() {
         const msg = JSON.parse(event.data);
 
         if (msg.type === 'task_update' && msg.log) {
-          logs.push(msg.log);
           setNodeStatuses((prev) => ({
             ...prev,
             [msg.log.node_id]: { status: msg.log.status, output: msg.log.output },
           }));
-          setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
+          if (msg.log.status !== 'running') {
+            logs.push(msg.log);
+            setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
+          }
         }
 
         if (msg.type === 'workflow_done') {

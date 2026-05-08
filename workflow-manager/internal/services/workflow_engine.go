@@ -72,6 +72,11 @@ func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
 
 	for nodeID, count := range we.indegree {
 		if count == 0 {
+			eventCh <- models.TaskLog{
+				NodeID: nodeID,
+				Label:  we.labels[nodeID],
+				Status: "running",
+			}
 			go we.runTask(nodeID, doneCh)
 		}
 	}
@@ -110,6 +115,11 @@ func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
 						err:    fmt.Errorf("skipped"),
 					}
 				} else {
+					eventCh <- models.TaskLog{
+						NodeID: childID,
+						Label:  we.labels[childID],
+						Status: "running",
+					}
 					go we.runTask(childID, doneCh)
 				}
 			}
