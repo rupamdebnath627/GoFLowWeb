@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"GoFlowWeb/internal/models"
+	"GoFlowWeb/internal/repositories"
 	"GoFlowWeb/internal/services"
 	"GoFlowWeb/internal/utils"
 
@@ -17,6 +20,12 @@ var registry = services.NewRegistry()
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+var logRepo *repositories.LogRepository
+
+func InitHandlers(db *sql.DB) {
+	logRepo = repositories.NewLogRepository(db)
 }
 
 func ExecuteWorkflow(c *gin.Context) {
@@ -167,4 +176,39 @@ func WorkflowWS(c *gin.Context) {
 	if err := conn.WriteJSON(done); err != nil {
 		fmt.Printf("WebSocket final write failed: %v\n", err)
 	}
+
+	// Persist execution result
+	if logRepo != nil {
+		if err := logRepo.SaveWorkflowLog(id, status, message, logs); err != nil {
+			fmt.Printf("Failed to save workflow log: %v\n", err)
+		}
+	}
+}
+
+func GetWorkflowLogs(c *gin.Context) {
+	logs, err := logRepo.GetAllWorkflowLogs()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve logs"})
+		return
+	}
+	if logs == nil {
+		logs = []repositories.WorkflowLog{}
+	}
+	c.JSON(http.StatusOK, logs)
+}
+
+func GetWorkflowLog(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid log id"})
+		return
+	}
+
+	log, err := logRepo.GetWorkflowLog(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "log not found"})
+		return
+	}
+	c.JSON(http.StatusOK, log)
 }

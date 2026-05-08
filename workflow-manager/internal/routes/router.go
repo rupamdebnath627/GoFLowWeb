@@ -12,4 +12,7 @@ func SetupRouter(r *gin.Engine) {
 	r.POST("/pause/:id", handlers.PauseWorkflow)
 	r.POST("/resume/:id", handlers.ResumeWorkflow)
 	r.GET("/ws/:id", handlers.WorkflowWS)
+
+	r.GET("/logs", handlers.GetWorkflowLogs)
+	r.GET("/logs/:id", handlers.GetWorkflowLog)
 }
