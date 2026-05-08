@@ -15,17 +15,19 @@ function WorkflowPage() {
   };
 
   const graph = useWorkflowGraph({ onGraphChange: handleGraphChange });
-  const { status, error, execResult, nodeStatuses, isRunning, isPaused, execute, cancel, pause, resume, dismissError, dismissResult, showResult, hasResult, resetStatuses } = useWorkflowExecution();
+  const { status, error, execResult, nodeStatuses, isRunning, isPaused, execute, cancel, pause, resume, abort, dismissError, dismissResult, showResult, hasResult, resetStatuses } = useWorkflowExecution();
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
+    if (isRunning) await abort();
+    else resetStatuses();
     graph.resetGraph();
-    resetStatuses();
-  }, [graph, resetStatuses]);
+  }, [isRunning, abort, resetStatuses, graph]);
 
-  const handleClear = useCallback(() => {
+  const handleClear = useCallback(async () => {
+    if (isRunning) await abort();
+    else resetStatuses();
     graph.clearGraph();
-    resetStatuses();
-  }, [graph, resetStatuses]);
+  }, [isRunning, abort, resetStatuses, graph]);
 
   return (
     <>

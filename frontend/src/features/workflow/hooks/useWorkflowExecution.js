@@ -197,6 +197,27 @@ export default function useWorkflowExecution() {
     }
   }, []);
 
+  const abort = useCallback(async () => {
+    const id = workflowIdRef.current;
+    if (id) {
+      try {
+        await fetch(`${API_BASE}/cancel/${id}`, { method: 'POST' });
+      } catch { /* best effort */ }
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    workflowIdRef.current = null;
+    execResultRef.current = null;
+    setStatus('');
+    setError('');
+    setExecResult(null);
+    setNodeStatuses({});
+    setIsRunning(false);
+    setIsPaused(false);
+  }, []);
+
   return {
     status,
     error,
@@ -208,6 +229,7 @@ export default function useWorkflowExecution() {
     cancel,
     pause,
     resume,
+    abort,
     dismissError: () => setError(''),
     dismissResult: () => setExecResult(null),
     showResult: () => setExecResult(execResultRef.current),
