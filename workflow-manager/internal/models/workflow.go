@@ -32,5 +32,18 @@ type TaskLog struct {
 type WorkflowResponse struct {
 	Status  string    `json:"status"`
 	Message string    `json:"message"`
-	Logs    []TaskLog `json:"logs"`
+	Logs    []TaskLog `json:"logs,omitempty"`
+}
+
+type SubmitResponse struct {
+	WorkflowID string `json:"workflow_id"`
+	Status     string `json:"status"`
+}
+
+type WSEvent struct {
+	Type string  `json:"type"` // "task_update" or "workflow_done"
+	Log  *TaskLog `json:"log,omitempty"`
+	// workflow_done fields
+	Status  string `json:"status,omitempty"`
+	Message string `json:"message,omitempty"`
 }

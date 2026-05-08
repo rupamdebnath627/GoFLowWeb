@@ -18,7 +18,7 @@ function App() {
   const handleExecute = async ({ nodes, edges }) => {
     setError('');
     setExecResult(null);
-    setStatus('Executing workflow...');
+    setStatus('Submitting workflow...');
 
     const errors = validateWorkflow(nodes, edges);
     if (errors.length > 0) {
@@ -46,9 +46,45 @@ function App() {
         return;
       }
 
-      const result = await response.json();
-      setStatus('');
-      setExecResult(result);
+      const { workflow_id } = await response.json();
+      setStatus(`Workflow submitted (${workflow_id}). Connecting...`);
+
+      const ws = new WebSocket(`ws://localhost:8080/ws/${workflow_id}`);
+      const logs = [];
+
+      ws.onopen = () => {
+        setStatus(`Running workflow (${workflow_id})...`);
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'task_update' && msg.log) {
+          logs.push(msg.log);
+          setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
+        }
+
+        if (msg.type === 'workflow_done') {
+          setStatus('');
+          setExecResult({
+            status: msg.status,
+            message: msg.message,
+            logs: [...logs],
+          });
+          ws.close();
+        }
+      };
+
+      ws.onerror = () => {
+        setError('WebSocket connection failed.');
+        setStatus('');
+      };
+
+      ws.onclose = (event) => {
+        if (!event.wasClean && !execResult) {
+          setStatus('');
+        }
+      };
     } catch (err) {
       console.error("Error executing workflow:", err);
       setError("Failed to connect to backend.");

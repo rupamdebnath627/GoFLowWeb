@@ -3,7 +3,6 @@ package services
 import (
 	"fmt"
 	"os/exec"
-	"sync"
 	"time"
 
 	"GoFlowWeb/internal/models"
@@ -16,15 +15,13 @@ type taskResult struct {
 }
 
 type WorkflowEngine struct {
-	labels   map[string]string   // NodeID -> label
-	commands map[string]string   // NodeID -> command
-	optional map[string]bool     // NodeID -> is optional
-	children map[string][]string // adjacency list
-	parents  map[string][]string // reverse adjacency
-	indegree map[string]int      // dependency counter
-	failed   map[string]bool     // NodeID -> has failed (non-optional)
-	mu       sync.Mutex
-	logs     []models.TaskLog
+	labels   map[string]string
+	commands map[string]string
+	optional map[string]bool
+	children map[string][]string
+	parents  map[string][]string
+	indegree map[string]int
+	failed   map[string]bool
 }
 
 func NewWorkflowEngine() *WorkflowEngine {
@@ -54,7 +51,6 @@ func (we *WorkflowEngine) AddDependency(from, to string) {
 	we.indegree[to]++
 }
 
-// shouldSkip checks if a node has any non-optional parent that failed.
 func (we *WorkflowEngine) shouldSkip(nodeID string) bool {
 	for _, parentID := range we.parents[nodeID] {
 		if we.failed[parentID] && !we.optional[parentID] {
@@ -64,30 +60,16 @@ func (we *WorkflowEngine) shouldSkip(nodeID string) bool {
 	return false
 }
 
-func (we *WorkflowEngine) Execute() []models.TaskLog {
+// Execute runs the workflow and sends each task log to eventCh as it completes.
+// It closes eventCh when done.
+func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
+	defer close(eventCh)
+
 	totalTasks := len(we.labels)
 	completedTasks := 0
 	doneCh := make(chan taskResult, totalTasks)
 
 	fmt.Println("--- Starting Workflow Engine ---")
-	fmt.Println("Nodes:")
-	for id, label := range we.labels {
-		cmd := we.commands[id]
-		if cmd == "" {
-			cmd = "(no command)"
-		}
-		opt := ""
-		if we.optional[id] {
-			opt = " [optional]"
-		}
-		fmt.Printf("  %s: %s (indegree=%d)%s cmd=%q\n", id, label, we.indegree[id], opt, cmd)
-	}
-	fmt.Println("Edges:")
-	for parent, kids := range we.children {
-		for _, kid := range kids {
-			fmt.Printf("  %s -> %s\n", parent, kid)
-		}
-	}
 
 	for nodeID, count := range we.indegree {
 		if count == 0 {
@@ -105,36 +87,30 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 			if result.err != nil {
 				if we.optional[result.nodeID] {
 					status = "failed (optional)"
-					fmt.Printf("[%s] Failed (optional) (%d/%d): %v\n", result.nodeID, completedTasks, totalTasks, result.err)
 				} else {
 					status = "failed"
 					we.failed[result.nodeID] = true
-					fmt.Printf("[%s] Failed (%d/%d): %v\n", result.nodeID, completedTasks, totalTasks, result.err)
 				}
-			} else {
-				fmt.Printf("[%s] Completed (%d/%d)\n", result.nodeID, completedTasks, totalTasks)
 			}
 
-			we.mu.Lock()
-			we.logs = append(we.logs, models.TaskLog{
+			log := models.TaskLog{
 				NodeID: result.nodeID,
 				Label:  we.labels[result.nodeID],
 				Status: status,
 				Output: result.output,
-			})
-			we.mu.Unlock()
+			}
+			fmt.Printf("[%s] %s (%d/%d)\n", result.nodeID, status, completedTasks, totalTasks)
+			eventCh <- log
 
 			for _, childID := range we.children[result.nodeID] {
 				we.indegree[childID]--
 				if we.indegree[childID] == 0 {
 					if we.shouldSkip(childID) {
-						// A required parent failed — skip this node and propagate
 						we.failed[childID] = true
-						fmt.Printf("[%s] Skipped (parent failed)\n", childID)
 						doneCh <- taskResult{
 							nodeID: childID,
 							output: "skipped: a required parent task failed",
-							err:    fmt.Errorf("skipped: a required parent task failed"),
+							err:    fmt.Errorf("skipped"),
 						}
 					} else {
 						go we.runTask(childID, doneCh)
@@ -143,25 +119,17 @@ func (we *WorkflowEngine) Execute() []models.TaskLog {
 			}
 		case <-timeout:
 			fmt.Printf("--- Workflow TIMEOUT: completed %d/%d tasks ---\n", completedTasks, totalTasks)
-			fmt.Println("Stuck nodes (indegree > 0):")
-			for id, deg := range we.indegree {
-				if deg > 0 {
-					fmt.Printf("  %s: %s (indegree=%d)\n", id, we.labels[id], deg)
-				}
-			}
-			we.mu.Lock()
-			we.logs = append(we.logs, models.TaskLog{
+			eventCh <- models.TaskLog{
 				NodeID: "engine",
-				Label:  "Workflow timed out - possible cycle or missing edges",
+				Label:  "Workflow timed out",
 				Status: "error",
-			})
-			we.mu.Unlock()
-			return we.logs
+				Output: "possible cycle or missing edges",
+			}
+			return
 		}
 	}
 
 	fmt.Println("--- Workflow Complete ---")
-	return we.logs
 }
 
 func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- taskResult) {
@@ -171,12 +139,10 @@ func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- taskResult) {
 	fmt.Printf("[%s] Executing: %s\n", nodeID, label)
 
 	if command == "" {
-		fmt.Printf("[%s] No command, skipping\n", nodeID)
 		doneCh <- taskResult{nodeID: nodeID, output: "(no command)"}
 		return
 	}
 
-	fmt.Printf("[%s] Running: %s\n", nodeID, command)
 	cmd := exec.Command("bash", "-c", command)
 	out, err := cmd.CombinedOutput()
 	output := string(out)
@@ -186,11 +152,11 @@ func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- taskResult) {
 		return
 	}
 
-	fmt.Printf("[%s] Output: %s\n", nodeID, output)
 	doneCh <- taskResult{nodeID: nodeID, output: output}
 }
 
-func ExecuteWorkflow(nodes []models.Node, edges []models.Edge) []models.TaskLog {
+// StartWorkflow builds the engine and runs it in a goroutine, returning the event channel.
+func StartWorkflow(nodes []models.Node, edges []models.Edge) <-chan models.TaskLog {
 	engine := NewWorkflowEngine()
 
 	for _, node := range nodes {
@@ -201,5 +167,7 @@ func ExecuteWorkflow(nodes []models.Node, edges []models.Edge) []models.TaskLog 
 		engine.AddDependency(edge.Source, edge.Target)
 	}
 
-	return engine.Execute()
+	eventCh := make(chan models.TaskLog, len(nodes))
+	go engine.Execute(eventCh)
+	return eventCh
 }
