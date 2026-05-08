@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sync/atomic"
 	"syscall"
 
 	"GoFlowWeb/internal/models"
@@ -24,17 +25,23 @@ type WorkflowEngine struct {
 	parents  map[string][]string
 	indegree map[string]int
 	failed   map[string]bool
+
+	paused        atomic.Bool
+	pauseCh       chan struct{} // closed when resumed, recreated on pause
+	pauseNotifyCh chan struct{} // signals Execute loop that pause was requested
 }
 
 func NewWorkflowEngine() *WorkflowEngine {
 	return &WorkflowEngine{
-		labels:   make(map[string]string),
-		commands: make(map[string]string),
-		optional: make(map[string]bool),
-		children: make(map[string][]string),
-		parents:  make(map[string][]string),
-		indegree: make(map[string]int),
-		failed:   make(map[string]bool),
+		labels:        make(map[string]string),
+		commands:      make(map[string]string),
+		optional:      make(map[string]bool),
+		children:      make(map[string][]string),
+		parents:       make(map[string][]string),
+		indegree:      make(map[string]int),
+		failed:        make(map[string]bool),
+		pauseCh:       make(chan struct{}),
+		pauseNotifyCh: make(chan struct{}, 1),
 	}
 }
 
@@ -62,9 +69,55 @@ func (we *WorkflowEngine) shouldSkip(nodeID string) bool {
 	return false
 }
 
-// Execute runs the workflow and sends each task log to eventCh as it completes.
-// It closes eventCh when done. If ctx is cancelled, running tasks are killed
-// and remaining tasks are marked as cancelled.
+func (we *WorkflowEngine) Pause() {
+	if we.paused.CompareAndSwap(false, true) {
+		we.pauseCh = make(chan struct{})
+		// Notify the Execute loop
+		select {
+		case we.pauseNotifyCh <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (we *WorkflowEngine) Resume() {
+	if we.paused.CompareAndSwap(true, false) {
+		close(we.pauseCh)
+	}
+}
+
+func (we *WorkflowEngine) waitIfPaused(ctx context.Context) bool {
+	if !we.paused.Load() {
+		return false
+	}
+	select {
+	case <-we.pauseCh:
+		return false
+	case <-ctx.Done():
+		return true
+	}
+}
+
+func (we *WorkflowEngine) dispatchChild(ctx context.Context, childID string, eventCh chan<- models.TaskLog, doneCh chan taskResult) bool {
+	if we.paused.Load() && childID != "start" && childID != "end" {
+		eventCh <- models.TaskLog{
+			NodeID: childID,
+			Label:  we.labels[childID],
+			Status: "paused",
+		}
+		if we.waitIfPaused(ctx) {
+			return true
+		}
+	}
+	eventCh <- models.TaskLog{
+		NodeID: childID,
+		Label:  we.labels[childID],
+		Status: "running",
+	}
+	go we.runTask(ctx, childID, doneCh)
+	return false
+}
+
 func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.TaskLog) {
 	defer close(eventCh)
 
@@ -93,7 +146,6 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 		select {
 		case <-ctx.Done():
 			fmt.Println("--- Workflow Cancelled ---")
-			// Wait for currently running tasks to finish (they'll get killed by context)
 			for runningCount > 0 {
 				result := <-doneCh
 				runningCount--
@@ -106,7 +158,6 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 					Output: "cancelled by user",
 				}
 			}
-			// Mark all remaining tasks as cancelled
 			for nodeID := range we.labels {
 				if !completed[nodeID] {
 					completedTasks++
@@ -119,6 +170,14 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 				}
 			}
 			return
+
+		case <-we.pauseNotifyCh:
+			// Pause was requested — send a workflow-level pause event
+			eventCh <- models.TaskLog{
+				NodeID: "engine",
+				Label:  "Workflow paused",
+				Status: "paused",
+			}
 
 		case result := <-doneCh:
 			runningCount--
@@ -156,13 +215,23 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 						}
 						runningCount++
 					} else {
-						eventCh <- models.TaskLog{
-							NodeID: childID,
-							Label:  we.labels[childID],
-							Status: "running",
+						cancelled := we.dispatchChild(ctx, childID, eventCh, doneCh)
+						if cancelled {
+							for nodeID := range we.labels {
+								if !completed[nodeID] {
+									completedTasks++
+									eventCh <- models.TaskLog{
+										NodeID: nodeID,
+										Label:  we.labels[nodeID],
+										Status: "cancelled",
+										Output: "cancelled before execution",
+									}
+									completed[nodeID] = true
+								}
+							}
+							return
 						}
 						runningCount++
-						go we.runTask(ctx, childID, doneCh)
 					}
 				}
 			}
@@ -202,9 +271,8 @@ func (we *WorkflowEngine) runTask(ctx context.Context, nodeID string, doneCh cha
 
 	select {
 	case <-ctx.Done():
-		// Kill the entire process group (bash + all children like sleep)
 		if cmd.Process != nil {
-			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
 		<-waitDone
 		doneCh <- taskResult{nodeID: nodeID, output: buf.String(), err: ctx.Err()}
@@ -218,9 +286,7 @@ func (we *WorkflowEngine) runTask(ctx context.Context, nodeID string, doneCh cha
 	}
 }
 
-// StartWorkflow builds the engine and runs it in a goroutine, returning the event channel
-// and a cancel function to stop the workflow.
-func StartWorkflow(nodes []models.Node, edges []models.Edge) (<-chan models.TaskLog, context.CancelFunc) {
+func StartWorkflow(nodes []models.Node, edges []models.Edge) (<-chan models.TaskLog, context.CancelFunc, *WorkflowEngine) {
 	engine := NewWorkflowEngine()
 
 	for _, node := range nodes {
@@ -234,5 +300,5 @@ func StartWorkflow(nodes []models.Node, edges []models.Edge) (<-chan models.Task
 	ctx, cancel := context.WithCancel(context.Background())
 	eventCh := make(chan models.TaskLog, len(nodes)*2)
 	go engine.Execute(ctx, eventCh)
-	return eventCh, cancel
+	return eventCh, cancel, engine
 }

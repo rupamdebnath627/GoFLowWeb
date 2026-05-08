@@ -73,6 +73,10 @@
   color: #9ca3af;
 }
 
+.statusPaused {
+  color: #e65100;
+}
+
 .statusRunning {
   color: #61dafb;
 }

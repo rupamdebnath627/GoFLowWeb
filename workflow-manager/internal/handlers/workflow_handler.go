@@ -18,10 +18,10 @@ import (
 type workflowEntry struct {
 	eventCh <-chan models.TaskLog
 	cancel  context.CancelFunc
-	claimed bool // true once a WebSocket has taken over streaming
+	engine  *services.WorkflowEngine
+	claimed bool
 }
 
-// In-memory store of running workflows
 var (
 	workflows   = make(map[string]*workflowEntry)
 	workflowsMu sync.Mutex
@@ -51,13 +51,12 @@ func ExecuteWorkflow(c *gin.Context) {
 		return
 	}
 
-	// Start workflow asynchronously
-	eventCh, cancel := services.StartWorkflow(req.Nodes, req.Edges)
+	eventCh, cancel, engine := services.StartWorkflow(req.Nodes, req.Edges)
 
 	workflowsMu.Lock()
 	workflowSeq++
 	id := fmt.Sprintf("wf-%d", workflowSeq)
-	workflows[id] = &workflowEntry{eventCh: eventCh, cancel: cancel}
+	workflows[id] = &workflowEntry{eventCh: eventCh, cancel: cancel, engine: engine}
 	workflowsMu.Unlock()
 
 	c.JSON(http.StatusAccepted, models.SubmitResponse{
@@ -82,13 +81,45 @@ func CancelWorkflow(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "cancelling", "workflow_id": id})
 }
 
+func PauseWorkflow(c *gin.Context) {
+	id := c.Param("id")
+
+	workflowsMu.Lock()
+	entry, exists := workflows[id]
+	workflowsMu.Unlock()
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
+		return
+	}
+
+	entry.engine.Pause()
+	c.JSON(http.StatusOK, gin.H{"status": "paused", "workflow_id": id})
+}
+
+func ResumeWorkflow(c *gin.Context) {
+	id := c.Param("id")
+
+	workflowsMu.Lock()
+	entry, exists := workflows[id]
+	workflowsMu.Unlock()
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
+		return
+	}
+
+	entry.engine.Resume()
+	c.JSON(http.StatusOK, gin.H{"status": "resumed", "workflow_id": id})
+}
+
 func WorkflowWS(c *gin.Context) {
 	id := c.Param("id")
 
 	workflowsMu.Lock()
 	entry, exists := workflows[id]
 	if exists && entry.claimed {
-		exists = false // already claimed by another WS
+		exists = false
 	}
 	if exists {
 		entry.claimed = true
@@ -124,12 +155,10 @@ func WorkflowWS(c *gin.Context) {
 		}
 	}
 
-	// Clean up from map now that workflow is done
 	workflowsMu.Lock()
 	delete(workflows, id)
 	workflowsMu.Unlock()
 
-	// Determine final status
 	status := "success"
 	message := fmt.Sprintf("Workflow completed: %d tasks", len(logs))
 

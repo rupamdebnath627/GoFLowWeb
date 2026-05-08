@@ -40,6 +40,17 @@
   color: #546e7a;
 }
 
+.statusPaused {
+  border-color: #ff9800;
+  background: #fff3e0;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.3);
+}
+
+.statusPaused .statusIcon,
+.statusPaused .statusLabel {
+  color: #e65100;
+}
+
 .statusCompleted {
   border-color: #4caf50;
   background: #e8f5e9;

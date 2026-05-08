@@ -9,6 +9,7 @@ export default function useWorkflowExecution() {
   const [execResult, setExecResult] = useState(null);
   const [nodeStatuses, setNodeStatuses] = useState({});
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const execResultRef = useRef(null);
   const workflowIdRef = useRef(null);
 
@@ -16,6 +17,7 @@ export default function useWorkflowExecution() {
     setError('');
     setExecResult(null);
     setNodeStatuses({});
+    setIsPaused(false);
     execResultRef.current = null;
     workflowIdRef.current = null;
     setStatus('Submitting workflow...');
@@ -73,7 +75,10 @@ export default function useWorkflowExecution() {
             ...prev,
             [msg.log.node_id]: { status: msg.log.status, output: msg.log.output },
           }));
-          if (msg.log.status !== 'running') {
+          if (msg.log.status === 'paused') {
+            setIsPaused(true);
+            setStatus(`Workflow paused (${workflow_id})`);
+          } else if (msg.log.status !== 'running') {
             logs.push(msg.log);
             setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
           }
@@ -82,6 +87,7 @@ export default function useWorkflowExecution() {
         if (msg.type === 'workflow_done') {
           setStatus('');
           setIsRunning(false);
+          setIsPaused(false);
           workflowIdRef.current = null;
           const result = {
             status: msg.status,
@@ -98,12 +104,14 @@ export default function useWorkflowExecution() {
         setError('WebSocket connection failed.');
         setStatus('');
         setIsRunning(false);
+        setIsPaused(false);
       };
 
       ws.onclose = (event) => {
         if (!event.wasClean && !execResultRef.current) {
           setStatus('');
           setIsRunning(false);
+          setIsPaused(false);
         }
       };
     } catch (err) {
@@ -129,14 +137,50 @@ export default function useWorkflowExecution() {
     }
   }, []);
 
+  const pause = useCallback(async () => {
+    const id = workflowIdRef.current;
+    if (!id) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/pause/${id}`, { method: 'POST' });
+      if (!res.ok) {
+        setError('Failed to pause workflow.');
+      }
+    } catch (err) {
+      console.error('Error pausing workflow:', err);
+      setError('Failed to pause workflow.');
+    }
+  }, []);
+
+  const resume = useCallback(async () => {
+    const id = workflowIdRef.current;
+    if (!id) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/resume/${id}`, { method: 'POST' });
+      if (res.ok) {
+        setIsPaused(false);
+        setStatus(`Running workflow (${id})...`);
+      } else {
+        setError('Failed to resume workflow.');
+      }
+    } catch (err) {
+      console.error('Error resuming workflow:', err);
+      setError('Failed to resume workflow.');
+    }
+  }, []);
+
   return {
     status,
     error,
     execResult,
     nodeStatuses,
     isRunning,
+    isPaused,
     execute,
     cancel,
+    pause,
+    resume,
     dismissError: () => setError(''),
     dismissResult: () => setExecResult(null),
   };

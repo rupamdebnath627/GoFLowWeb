@@ -4,6 +4,7 @@ import styles from './styles/CustomNode.module.css';
 const STATUS_CLASS = {
   pending: 'statusPending',
   running: 'statusRunning',
+  paused: 'statusPaused',
   completed: 'statusCompleted',
   failed: 'statusFailed',
   'failed (optional)': 'statusFailedOptional',
@@ -15,6 +16,7 @@ const STATUS_CLASS = {
 const STATUS_ICON = {
   pending: '\u25CB',
   running: '\u25F7',
+  paused: '\u275A\u275A',
   completed: '\u2713',
   failed: '\u2717',
   'failed (optional)': '\u26A0',

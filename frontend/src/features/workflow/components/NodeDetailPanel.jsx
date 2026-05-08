@@ -4,6 +4,7 @@ import styles from './styles/NodeDetailPanel.module.css';
 const STATUS_CONFIG = {
   idle: { icon: '\u25CB', label: 'Not executed', className: 'statusIdle' },
   pending: { icon: '\u25CB', label: 'Pending', className: 'statusIdle' },
+  paused: { icon: '\u275A\u275A', label: 'Paused', className: 'statusPaused' },
   running: { icon: '\u25F7', label: 'Running...', className: 'statusRunning' },
   completed: { icon: '\u2713', label: 'Completed', className: 'statusCompleted' },
   failed: { icon: '\u2717', label: 'Failed', className: 'statusFailed' },
@@ -16,7 +17,7 @@ const STATUS_CONFIG = {
 function NodeDetailPanel({ node, executionStatus, onSave, onClose }) {
   const isFixedNode = node.id === 'start' || node.id === 'end';
   const nodeStatus = executionStatus?.status || 'idle';
-  const isEditable = (nodeStatus === 'idle' || nodeStatus === 'pending') && !isFixedNode;
+  const isEditable = (nodeStatus === 'idle' || nodeStatus === 'pending' || nodeStatus === 'paused') && !isFixedNode;
   const statusInfo = STATUS_CONFIG[nodeStatus] || STATUS_CONFIG.idle;
 
   const [label, setLabel] = useState(node.data.label);
