@@ -7,11 +7,13 @@ export default function useWorkflowExecution() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [execResult, setExecResult] = useState(null);
+  const [nodeStatuses, setNodeStatuses] = useState({});
   const execResultRef = useRef(null);
 
   const execute = async ({ nodes, edges }) => {
     setError('');
     setExecResult(null);
+    setNodeStatuses({});
     execResultRef.current = null;
     setStatus('Submitting workflow...');
 
@@ -56,6 +58,10 @@ export default function useWorkflowExecution() {
 
         if (msg.type === 'task_update' && msg.log) {
           logs.push(msg.log);
+          setNodeStatuses((prev) => ({
+            ...prev,
+            [msg.log.node_id]: { status: msg.log.status, output: msg.log.output },
+          }));
           setStatus(`Running: ${msg.log.label} — ${msg.log.status} (${logs.length} tasks done)`);
         }
 
@@ -93,6 +99,7 @@ export default function useWorkflowExecution() {
     status,
     error,
     execResult,
+    nodeStatuses,
     execute,
     dismissError: () => setError(''),
     dismissResult: () => setExecResult(null),

@@ -3,7 +3,6 @@ package services
 import (
 	"fmt"
 	"os/exec"
-	"time"
 
 	"GoFlowWeb/internal/models"
 )
@@ -77,55 +76,43 @@ func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
 		}
 	}
 
-	timeout := time.After(time.Duration(totalTasks*30+30) * time.Second)
 	for completedTasks < totalTasks {
-		select {
-		case result := <-doneCh:
-			completedTasks++
+		result := <-doneCh
+		completedTasks++
 
-			status := "completed"
-			if result.err != nil {
-				if we.optional[result.nodeID] {
-					status = "failed (optional)"
-				} else {
-					status = "failed"
-					we.failed[result.nodeID] = true
-				}
+		status := "completed"
+		if result.err != nil {
+			if we.optional[result.nodeID] {
+				status = "failed (optional)"
+			} else {
+				status = "failed"
+				we.failed[result.nodeID] = true
 			}
+		}
 
-			log := models.TaskLog{
-				NodeID: result.nodeID,
-				Label:  we.labels[result.nodeID],
-				Status: status,
-				Output: result.output,
-			}
-			fmt.Printf("[%s] %s (%d/%d)\n", result.nodeID, status, completedTasks, totalTasks)
-			eventCh <- log
+		log := models.TaskLog{
+			NodeID: result.nodeID,
+			Label:  we.labels[result.nodeID],
+			Status: status,
+			Output: result.output,
+		}
+		fmt.Printf("[%s] %s (%d/%d)\n", result.nodeID, status, completedTasks, totalTasks)
+		eventCh <- log
 
-			for _, childID := range we.children[result.nodeID] {
-				we.indegree[childID]--
-				if we.indegree[childID] == 0 {
-					if we.shouldSkip(childID) {
-						we.failed[childID] = true
-						doneCh <- taskResult{
-							nodeID: childID,
-							output: "skipped: a required parent task failed",
-							err:    fmt.Errorf("skipped"),
-						}
-					} else {
-						go we.runTask(childID, doneCh)
+		for _, childID := range we.children[result.nodeID] {
+			we.indegree[childID]--
+			if we.indegree[childID] == 0 {
+				if we.shouldSkip(childID) {
+					we.failed[childID] = true
+					doneCh <- taskResult{
+						nodeID: childID,
+						output: "skipped: a required parent task failed",
+						err:    fmt.Errorf("skipped"),
 					}
+				} else {
+					go we.runTask(childID, doneCh)
 				}
 			}
-		case <-timeout:
-			fmt.Printf("--- Workflow TIMEOUT: completed %d/%d tasks ---\n", completedTasks, totalTasks)
-			eventCh <- models.TaskLog{
-				NodeID: "engine",
-				Label:  "Workflow timed out",
-				Status: "error",
-				Output: "possible cycle or missing edges",
-			}
-			return
 		}
 	}
 

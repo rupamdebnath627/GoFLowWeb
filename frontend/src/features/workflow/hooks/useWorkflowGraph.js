@@ -177,6 +177,16 @@ export default function useWorkflowGraph({ onGraphChange }) {
     setEdges(layoutedEdges);
   };
 
+  const updateNode = useCallback((nodeId, data) => {
+    setNodes((nds) => {
+      const updated = nds.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
+      );
+      nodesRef.current = updated;
+      return updated;
+    });
+  }, []);
+
   const handleConfirmDelete = useCallback(() => {
     if (pendingDelete) {
       applyDeletion({ type: pendingDelete.type, changes: pendingDelete.changes });
@@ -196,6 +206,7 @@ export default function useWorkflowGraph({ onGraphChange }) {
     onEdgesChange,
     onConnect,
     handleAddNode,
+    updateNode,
     handleConfirmDelete,
     handleCancelDelete,
   };
