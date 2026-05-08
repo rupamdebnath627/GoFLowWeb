@@ -1,19 +1,7 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import ReactFlow, {
-  addEdge,
-  applyNodeChanges,
-  applyEdgeChanges,
-  ConnectionLineType,
-  Background,
-  Controls
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import styles from './WorkflowCanvas.module.css';
-import NodeForm from './NodeForm';
-import CustomNode from './CustomNode';
-import ConfirmDialog from './ConfirmDialog';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { addEdge, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import getLayoutedElements from './useLayout';
-import { validateWorkflow } from './validateGraph';
+import { validateWorkflow } from '../utils/validateGraph';
 
 const START_NODE = { id: 'start', position: { x: 0, y: 0 }, data: { label: 'Start' }, type: 'custom', deletable: false };
 const END_NODE = { id: 'end', position: { x: 0, y: 0 }, data: { label: 'End' }, type: 'custom', deletable: false };
@@ -24,8 +12,7 @@ const { nodes: initialNodes, edges: initialEdges } = getLayoutedElements(
   [INITIAL_EDGE]
 );
 
-function WorkflowCanvas({ onExecute, onGraphChange }) {
-  const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
+export default function useWorkflowGraph({ onGraphChange }) {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
   const nodeCounterRef = useRef(1);
@@ -105,7 +92,7 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
         const tgtNode = nodesRef.current.find((n) => n.id === edge.target);
         const src = srcNode ? srcNode.data.label : edge.source;
         const tgt = tgtNode ? tgtNode.data.label : edge.target;
-        return `${src} → ${tgt}`;
+        return `${src} \u2192 ${tgt}`;
       });
       return `Deleting edge${descs.length > 1 ? 's' : ''}: ${descs.join(', ')}`;
     }
@@ -155,17 +142,6 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
     [simulateDeletion, describeRemovals, applyDeletion]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    if (pendingDelete) {
-      applyDeletion({ type: pendingDelete.type, changes: pendingDelete.changes });
-      setPendingDelete(null);
-    }
-  }, [pendingDelete, applyDeletion]);
-
-  const handleCancelDelete = useCallback(() => {
-    setPendingDelete(null);
-  }, []);
-
   const onConnect = useCallback(
     (connection) => setEdges((eds) => addEdge({ ...connection, type: 'smoothstep', markerEnd: { type: 'arrowclosed', width: 15, height: 15 } }, eds)),
     []
@@ -201,48 +177,26 @@ function WorkflowCanvas({ onExecute, onGraphChange }) {
     setEdges(layoutedEdges);
   };
 
-  const handleExecute = () => {
-    if (onExecute) onExecute({ nodes, edges });
+  const handleConfirmDelete = useCallback(() => {
+    if (pendingDelete) {
+      applyDeletion({ type: pendingDelete.type, changes: pendingDelete.changes });
+      setPendingDelete(null);
+    }
+  }, [pendingDelete, applyDeletion]);
+
+  const handleCancelDelete = useCallback(() => {
+    setPendingDelete(null);
+  }, []);
+
+  return {
+    nodes,
+    edges,
+    pendingDelete,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    handleAddNode,
+    handleConfirmDelete,
+    handleCancelDelete,
   };
-
-  return (
-    <div className={styles.container}>
-      <NodeForm nodes={nodes} onAddNode={handleAddNode} />
-
-      <div className={styles.main}>
-        <div className={styles.toolbar}>
-          <button onClick={handleExecute} className={styles.executeBtn}>
-            Execute Workflow
-          </button>
-        </div>
-
-        <div className={styles.canvas}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            connectionLineType={ConnectionLineType.SmoothStep}
-            fitView
-          >
-            <Background />
-            <Controls />
-          </ReactFlow>
-        </div>
-      </div>
-
-      {pendingDelete && (
-        <ConfirmDialog
-          message={pendingDelete.message}
-          warnings={pendingDelete.warnings}
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-        />
-      )}
-    </div>
-  );
 }
-
-export default WorkflowCanvas;

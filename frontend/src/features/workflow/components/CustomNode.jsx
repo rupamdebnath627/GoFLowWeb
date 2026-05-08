@@ -1,5 +1,5 @@
 import { Handle, Position } from 'reactflow';
-import styles from './CustomNode.module.css';
+import styles from './styles/CustomNode.module.css';
 
 function CustomNode({ data }) {
   return (

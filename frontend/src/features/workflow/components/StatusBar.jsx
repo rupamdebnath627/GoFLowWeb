@@ -1,4 +1,4 @@
-import styles from './StatusBar.module.css';
+import styles from './styles/StatusBar.module.css';
 
 function StatusBar({ error, warning, status, onDismissError, onDismissWarning }) {
   return (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import styles from './NodeForm.module.css';
+import styles from './styles/NodeForm.module.css';
 
 const NODE_TYPES = ['Task', 'Decision'];
 

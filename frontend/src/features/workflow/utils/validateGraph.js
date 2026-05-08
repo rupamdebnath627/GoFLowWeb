@@ -68,7 +68,6 @@ function bfs(startId, adj) {
   return visited;
 }
 
-// Returns an array of error strings, or empty array if valid.
 export function validateWorkflow(nodes, edges) {
   const errors = [];
   if (nodes.length < 2) return errors;
@@ -78,7 +77,6 @@ export function validateWorkflow(nodes, edges) {
     labels[node.id] = node.data.label;
   }
 
-  // Build forward adjacency
   const fwd = {};
   const rev = {};
   for (const node of nodes) {
@@ -90,7 +88,6 @@ export function validateWorkflow(nodes, edges) {
     if (rev[edge.target]) rev[edge.target].push(edge.source);
   }
 
-  // Check: all nodes reachable from Start
   const fromStart = bfs('start', fwd);
   const unreachable = nodes.filter((n) => !fromStart.has(n.id));
   if (unreachable.length > 0) {
@@ -98,7 +95,6 @@ export function validateWorkflow(nodes, edges) {
     errors.push(`Unreachable from Start: ${names}`);
   }
 
-  // Check: End reachable from all nodes (BFS backwards from End)
   const toEnd = bfs('end', rev);
   const cantReachEnd = nodes.filter((n) => !toEnd.has(n.id));
   if (cantReachEnd.length > 0) {
@@ -106,10 +102,9 @@ export function validateWorkflow(nodes, edges) {
     errors.push(`Cannot reach End: ${names}`);
   }
 
-  // Check: cycle
   const cycle = findCycle(nodes, edges);
   if (cycle) {
-    errors.push(`Circular dependency: ${cycle.join(' → ')}`);
+    errors.push(`Circular dependency: ${cycle.join(' \u2192 ')}`);
   }
 
   return errors;

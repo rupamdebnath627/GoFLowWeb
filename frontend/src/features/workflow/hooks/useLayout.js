@@ -43,15 +43,12 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
       const dy = targetPos.y - sourcePos.y;
 
       if (Math.abs(dx) > Math.abs(dy)) {
-        // Primarily horizontal
         sourceHandle = dx > 0 ? 'source-right' : 'source-left';
         targetHandle = dx > 0 ? 'target-left' : 'target-right';
       } else if (dy > 0) {
-        // Target is below source (normal top-to-bottom flow)
         sourceHandle = 'source-bottom';
         targetHandle = 'target-top';
       } else {
-        // Target is above source (back-edge / upward)
         sourceHandle = 'source-top';
         targetHandle = 'target-bottom';
       }

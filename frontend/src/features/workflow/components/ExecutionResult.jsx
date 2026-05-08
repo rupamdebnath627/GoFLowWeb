@@ -1,4 +1,4 @@
-import styles from './ExecutionResult.module.css';
+import styles from './styles/ExecutionResult.module.css';
 
 const STATUS_ICONS = {
   completed: '\u2713',

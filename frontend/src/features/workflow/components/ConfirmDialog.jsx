@@ -1,4 +1,4 @@
-import styles from './ConfirmDialog.module.css';
+import styles from './styles/ConfirmDialog.module.css';
 
 function ConfirmDialog({ message, warnings, onConfirm, onCancel }) {
   return (
