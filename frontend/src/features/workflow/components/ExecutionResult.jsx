@@ -5,18 +5,25 @@ const STATUS_ICONS = {
   failed: '\u2717',
   'failed (optional)': '\u26A0',
   skipped: '\u2192',
+  cancelled: '\u2715',
   error: '\u2717',
 };
 
+const TITLE_MAP = {
+  success: { text: 'Workflow Completed', className: 'titleSuccess' },
+  failed: { text: 'Workflow Failed', className: 'titleFailed' },
+  cancelled: { text: 'Workflow Cancelled', className: 'titleCancelled' },
+};
+
 function ExecutionResult({ result, onClose }) {
-  const isFailed = result.status === 'failed';
+  const titleInfo = TITLE_MAP[result.status] || TITLE_MAP.failed;
 
   return (
     <div className={styles.overlay}>
       <div className={styles.panel}>
         <div className={styles.header}>
-          <h3 className={`${styles.title} ${isFailed ? styles.titleFailed : styles.titleSuccess}`}>
-            {isFailed ? 'Workflow Failed' : 'Workflow Completed'}
+          <h3 className={`${styles.title} ${styles[titleInfo.className]}`}>
+            {titleInfo.text}
           </h3>
           <button onClick={onClose} className={styles.closeBtn}>&times;</button>
         </div>
@@ -29,7 +36,7 @@ function ExecutionResult({ result, onClose }) {
               <div className={styles.logHeader}>
                 <span className={styles.logIcon}>{STATUS_ICONS[log.status] || '?'}</span>
                 <span className={styles.logLabel}>{log.label}</span>
-                <span className={`${styles.logStatus} ${log.status === 'completed' ? styles.statusOk : styles.statusFail}`}>
+                <span className={`${styles.logStatus} ${log.status === 'completed' ? styles.statusOk : log.status === 'cancelled' ? styles.statusCancelled : styles.statusFail}`}>
                   {log.status}
                 </span>
               </div>

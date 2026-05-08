@@ -9,6 +9,7 @@ const STATUS_CONFIG = {
   failed: { icon: '\u2717', label: 'Failed', className: 'statusFailed' },
   'failed (optional)': { icon: '\u26A0', label: 'Failed (optional)', className: 'statusFailed' },
   skipped: { icon: '\u2192', label: 'Skipped', className: 'statusSkipped' },
+  cancelled: { icon: '\u2715', label: 'Cancelled', className: 'statusCancelled' },
   error: { icon: '\u2717', label: 'Error', className: 'statusFailed' },
 };
 

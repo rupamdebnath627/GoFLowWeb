@@ -7,7 +7,7 @@ import CustomNode from './CustomNode';
 import ConfirmDialog from './ConfirmDialog';
 import NodeDetailPanel from './NodeDetailPanel';
 
-function WorkflowCanvas({ graph, onExecute, nodeStatuses }) {
+function WorkflowCanvas({ graph, onExecute, onCancel, isRunning, nodeStatuses }) {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
 
@@ -50,9 +50,18 @@ function WorkflowCanvas({ graph, onExecute, nodeStatuses }) {
 
       <div className={styles.main}>
         <div className={styles.toolbar}>
-          <button onClick={() => onExecute({ nodes, edges })} className={styles.executeBtn}>
+          <button
+            onClick={() => onExecute({ nodes, edges })}
+            className={styles.executeBtn}
+            disabled={isRunning}
+          >
             Execute Workflow
           </button>
+          {isRunning && (
+            <button onClick={onCancel} className={styles.cancelBtn}>
+              Cancel Workflow
+            </button>
+          )}
         </div>
 
         <div className={styles.canvas}>

@@ -15,11 +15,11 @@ function WorkflowPage() {
   };
 
   const graph = useWorkflowGraph({ onGraphChange: handleGraphChange });
-  const { status, error, execResult, nodeStatuses, execute, dismissError, dismissResult } = useWorkflowExecution();
+  const { status, error, execResult, nodeStatuses, isRunning, execute, cancel, dismissError, dismissResult } = useWorkflowExecution();
 
   return (
     <>
-      <WorkflowCanvas graph={graph} onExecute={execute} nodeStatuses={nodeStatuses} />
+      <WorkflowCanvas graph={graph} onExecute={execute} onCancel={cancel} isRunning={isRunning} nodeStatuses={nodeStatuses} />
       <StatusBar
         error={error}
         warning={warning}

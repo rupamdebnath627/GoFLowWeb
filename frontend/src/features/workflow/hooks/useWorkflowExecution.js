@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { validateWorkflow } from '../utils/validateGraph';
 
 const API_BASE = 'http://localhost:8080';
@@ -8,13 +8,16 @@ export default function useWorkflowExecution() {
   const [error, setError] = useState('');
   const [execResult, setExecResult] = useState(null);
   const [nodeStatuses, setNodeStatuses] = useState({});
+  const [isRunning, setIsRunning] = useState(false);
   const execResultRef = useRef(null);
+  const workflowIdRef = useRef(null);
 
   const execute = async ({ nodes, edges }) => {
     setError('');
     setExecResult(null);
     setNodeStatuses({});
     execResultRef.current = null;
+    workflowIdRef.current = null;
     setStatus('Submitting workflow...');
 
     const errors = validateWorkflow(nodes, edges);
@@ -44,6 +47,8 @@ export default function useWorkflowExecution() {
       }
 
       const { workflow_id } = await response.json();
+      workflowIdRef.current = workflow_id;
+      setIsRunning(true);
       setStatus(`Workflow submitted (${workflow_id}). Connecting...`);
 
       const ws = new WebSocket(`ws://${location.hostname}:8080/ws/${workflow_id}`);
@@ -76,6 +81,8 @@ export default function useWorkflowExecution() {
 
         if (msg.type === 'workflow_done') {
           setStatus('');
+          setIsRunning(false);
+          workflowIdRef.current = null;
           const result = {
             status: msg.status,
             message: msg.message,
@@ -90,26 +97,44 @@ export default function useWorkflowExecution() {
       ws.onerror = () => {
         setError('WebSocket connection failed.');
         setStatus('');
+        setIsRunning(false);
       };
 
       ws.onclose = (event) => {
         if (!event.wasClean && !execResultRef.current) {
           setStatus('');
+          setIsRunning(false);
         }
       };
     } catch (err) {
       console.error('Error executing workflow:', err);
       setError('Failed to connect to backend.');
       setStatus('');
+      setIsRunning(false);
     }
   };
+
+  const cancel = useCallback(async () => {
+    const id = workflowIdRef.current;
+    if (!id) return;
+
+    try {
+      await fetch(`${API_BASE}/cancel/${id}`, { method: 'POST' });
+      setStatus('Cancelling workflow...');
+    } catch (err) {
+      console.error('Error cancelling workflow:', err);
+      setError('Failed to cancel workflow.');
+    }
+  }, []);
 
   return {
     status,
     error,
     execResult,
     nodeStatuses,
+    isRunning,
     execute,
+    cancel,
     dismissError: () => setError(''),
     dismissResult: () => setExecResult(null),
   };

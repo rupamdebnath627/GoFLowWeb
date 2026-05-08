@@ -89,6 +89,10 @@
   color: #ffb74d;
 }
 
+.statusCancelled {
+  color: #7b1fa2;
+}
+
 .outputSection {
   margin-bottom: 16px;
 }

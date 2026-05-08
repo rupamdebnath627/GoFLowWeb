@@ -1,8 +1,11 @@
 package services
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
+	"syscall"
 
 	"GoFlowWeb/internal/models"
 )
@@ -60,13 +63,15 @@ func (we *WorkflowEngine) shouldSkip(nodeID string) bool {
 }
 
 // Execute runs the workflow and sends each task log to eventCh as it completes.
-// It closes eventCh when done.
-func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
+// It closes eventCh when done. If ctx is cancelled, running tasks are killed
+// and remaining tasks are marked as cancelled.
+func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.TaskLog) {
 	defer close(eventCh)
 
 	totalTasks := len(we.labels)
 	completedTasks := 0
 	doneCh := make(chan taskResult, totalTasks)
+	runningCount := 0
 
 	fmt.Println("--- Starting Workflow Engine ---")
 
@@ -77,50 +82,88 @@ func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
 				Label:  we.labels[nodeID],
 				Status: "running",
 			}
-			go we.runTask(nodeID, doneCh)
+			runningCount++
+			go we.runTask(ctx, nodeID, doneCh)
 		}
 	}
 
+	completed := make(map[string]bool)
+
 	for completedTasks < totalTasks {
-		result := <-doneCh
-		completedTasks++
-
-		status := "completed"
-		if result.err != nil {
-			if we.optional[result.nodeID] {
-				status = "failed (optional)"
-			} else {
-				status = "failed"
-				we.failed[result.nodeID] = true
+		select {
+		case <-ctx.Done():
+			fmt.Println("--- Workflow Cancelled ---")
+			// Wait for currently running tasks to finish (they'll get killed by context)
+			for runningCount > 0 {
+				result := <-doneCh
+				runningCount--
+				completedTasks++
+				completed[result.nodeID] = true
+				eventCh <- models.TaskLog{
+					NodeID: result.nodeID,
+					Label:  we.labels[result.nodeID],
+					Status: "cancelled",
+					Output: "cancelled by user",
+				}
 			}
-		}
-
-		log := models.TaskLog{
-			NodeID: result.nodeID,
-			Label:  we.labels[result.nodeID],
-			Status: status,
-			Output: result.output,
-		}
-		fmt.Printf("[%s] %s (%d/%d)\n", result.nodeID, status, completedTasks, totalTasks)
-		eventCh <- log
-
-		for _, childID := range we.children[result.nodeID] {
-			we.indegree[childID]--
-			if we.indegree[childID] == 0 {
-				if we.shouldSkip(childID) {
-					we.failed[childID] = true
-					doneCh <- taskResult{
-						nodeID: childID,
-						output: "skipped: a required parent task failed",
-						err:    fmt.Errorf("skipped"),
-					}
-				} else {
+			// Mark all remaining tasks as cancelled
+			for nodeID := range we.labels {
+				if !completed[nodeID] {
+					completedTasks++
 					eventCh <- models.TaskLog{
-						NodeID: childID,
-						Label:  we.labels[childID],
-						Status: "running",
+						NodeID: nodeID,
+						Label:  we.labels[nodeID],
+						Status: "cancelled",
+						Output: "cancelled before execution",
 					}
-					go we.runTask(childID, doneCh)
+				}
+			}
+			return
+
+		case result := <-doneCh:
+			runningCount--
+			completedTasks++
+			completed[result.nodeID] = true
+
+			status := "completed"
+			if result.err != nil {
+				if we.optional[result.nodeID] {
+					status = "failed (optional)"
+				} else {
+					status = "failed"
+					we.failed[result.nodeID] = true
+				}
+			}
+
+			log := models.TaskLog{
+				NodeID: result.nodeID,
+				Label:  we.labels[result.nodeID],
+				Status: status,
+				Output: result.output,
+			}
+			fmt.Printf("[%s] %s (%d/%d)\n", result.nodeID, status, completedTasks, totalTasks)
+			eventCh <- log
+
+			for _, childID := range we.children[result.nodeID] {
+				we.indegree[childID]--
+				if we.indegree[childID] == 0 {
+					if we.shouldSkip(childID) {
+						we.failed[childID] = true
+						doneCh <- taskResult{
+							nodeID: childID,
+							output: "skipped: a required parent task failed",
+							err:    fmt.Errorf("skipped"),
+						}
+						runningCount++
+					} else {
+						eventCh <- models.TaskLog{
+							NodeID: childID,
+							Label:  we.labels[childID],
+							Status: "running",
+						}
+						runningCount++
+						go we.runTask(ctx, childID, doneCh)
+					}
 				}
 			}
 		}
@@ -129,7 +172,7 @@ func (we *WorkflowEngine) Execute(eventCh chan<- models.TaskLog) {
 	fmt.Println("--- Workflow Complete ---")
 }
 
-func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- taskResult) {
+func (we *WorkflowEngine) runTask(ctx context.Context, nodeID string, doneCh chan<- taskResult) {
 	label := we.labels[nodeID]
 	command := we.commands[nodeID]
 
@@ -141,19 +184,43 @@ func (we *WorkflowEngine) runTask(nodeID string, doneCh chan<- taskResult) {
 	}
 
 	cmd := exec.Command("bash", "-c", command)
-	out, err := cmd.CombinedOutput()
-	output := string(out)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	if err != nil {
-		doneCh <- taskResult{nodeID: nodeID, output: output, err: fmt.Errorf("%s: %w", output, err)}
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	if err := cmd.Start(); err != nil {
+		doneCh <- taskResult{nodeID: nodeID, output: err.Error(), err: err}
 		return
 	}
 
-	doneCh <- taskResult{nodeID: nodeID, output: output}
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- cmd.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+		// Kill the entire process group (bash + all children like sleep)
+		if cmd.Process != nil {
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		<-waitDone
+		doneCh <- taskResult{nodeID: nodeID, output: buf.String(), err: ctx.Err()}
+	case err := <-waitDone:
+		output := buf.String()
+		if err != nil {
+			doneCh <- taskResult{nodeID: nodeID, output: output, err: fmt.Errorf("%s: %w", output, err)}
+		} else {
+			doneCh <- taskResult{nodeID: nodeID, output: output}
+		}
+	}
 }
 
-// StartWorkflow builds the engine and runs it in a goroutine, returning the event channel.
-func StartWorkflow(nodes []models.Node, edges []models.Edge) <-chan models.TaskLog {
+// StartWorkflow builds the engine and runs it in a goroutine, returning the event channel
+// and a cancel function to stop the workflow.
+func StartWorkflow(nodes []models.Node, edges []models.Edge) (<-chan models.TaskLog, context.CancelFunc) {
 	engine := NewWorkflowEngine()
 
 	for _, node := range nodes {
@@ -164,7 +231,8 @@ func StartWorkflow(nodes []models.Node, edges []models.Edge) <-chan models.TaskL
 		engine.AddDependency(edge.Source, edge.Target)
 	}
 
-	eventCh := make(chan models.TaskLog, len(nodes))
-	go engine.Execute(eventCh)
-	return eventCh
+	ctx, cancel := context.WithCancel(context.Background())
+	eventCh := make(chan models.TaskLog, len(nodes)*2)
+	go engine.Execute(ctx, eventCh)
+	return eventCh, cancel
 }

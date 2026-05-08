@@ -31,8 +31,27 @@
   font-size: 13px;
 }
 
-.executeBtn:hover {
+.executeBtn:hover:not(:disabled) {
   background-color: #4a5060;
+}
+
+.executeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  cursor: pointer;
+  background-color: #d32f2f;
+  color: white;
+  border: 1px solid #f44336;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.cancelBtn:hover {
+  background-color: #b71c1c;
 }
 
 .canvas {

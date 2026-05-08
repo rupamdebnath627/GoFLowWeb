@@ -8,5 +8,6 @@ import (
 
 func SetupRouter(r *gin.Engine) {
 	r.POST("/execute", handlers.ExecuteWorkflow)
+	r.POST("/cancel/:id", handlers.CancelWorkflow)
 	r.GET("/ws/:id", handlers.WorkflowWS)
 }

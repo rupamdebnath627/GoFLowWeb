@@ -41,6 +41,10 @@
   color: #f44336;
 }
 
+.titleCancelled {
+  color: #7b1fa2;
+}
+
 .closeBtn {
   background: none;
   border: none;
@@ -117,6 +121,11 @@
 .statusFail {
   background: #b71c1c;
   color: #ef9a9a;
+}
+
+.statusCancelled {
+  background: #4a148c;
+  color: #ce93d8;
 }
 
 .logOutput {

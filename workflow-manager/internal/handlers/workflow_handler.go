@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,9 +15,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type workflowEntry struct {
+	eventCh <-chan models.TaskLog
+	cancel  context.CancelFunc
+	claimed bool // true once a WebSocket has taken over streaming
+}
+
 // In-memory store of running workflows
 var (
-	workflows   = make(map[string]<-chan models.TaskLog)
+	workflows   = make(map[string]*workflowEntry)
 	workflowsMu sync.Mutex
 	workflowSeq int
 )
@@ -45,12 +52,12 @@ func ExecuteWorkflow(c *gin.Context) {
 	}
 
 	// Start workflow asynchronously
-	eventCh := services.StartWorkflow(req.Nodes, req.Edges)
+	eventCh, cancel := services.StartWorkflow(req.Nodes, req.Edges)
 
 	workflowsMu.Lock()
 	workflowSeq++
 	id := fmt.Sprintf("wf-%d", workflowSeq)
-	workflows[id] = eventCh
+	workflows[id] = &workflowEntry{eventCh: eventCh, cancel: cancel}
 	workflowsMu.Unlock()
 
 	c.JSON(http.StatusAccepted, models.SubmitResponse{
@@ -59,13 +66,32 @@ func ExecuteWorkflow(c *gin.Context) {
 	})
 }
 
+func CancelWorkflow(c *gin.Context) {
+	id := c.Param("id")
+
+	workflowsMu.Lock()
+	entry, exists := workflows[id]
+	workflowsMu.Unlock()
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
+		return
+	}
+
+	entry.cancel()
+	c.JSON(http.StatusOK, gin.H{"status": "cancelling", "workflow_id": id})
+}
+
 func WorkflowWS(c *gin.Context) {
 	id := c.Param("id")
 
 	workflowsMu.Lock()
-	eventCh, exists := workflows[id]
+	entry, exists := workflows[id]
+	if exists && entry.claimed {
+		exists = false // already claimed by another WS
+	}
 	if exists {
-		delete(workflows, id) // consume once
+		entry.claimed = true
 	}
 	workflowsMu.Unlock()
 
@@ -82,7 +108,11 @@ func WorkflowWS(c *gin.Context) {
 	defer conn.Close()
 
 	var logs []models.TaskLog
-	for log := range eventCh {
+	cancelled := false
+	for log := range entry.eventCh {
+		if log.Status == "cancelled" {
+			cancelled = true
+		}
 		logs = append(logs, log)
 		evt := models.WSEvent{
 			Type: "task_update",
@@ -90,18 +120,29 @@ func WorkflowWS(c *gin.Context) {
 		}
 		if err := conn.WriteJSON(evt); err != nil {
 			fmt.Printf("WebSocket write failed: %v\n", err)
-			return
+			break
 		}
 	}
+
+	// Clean up from map now that workflow is done
+	workflowsMu.Lock()
+	delete(workflows, id)
+	workflowsMu.Unlock()
 
 	// Determine final status
 	status := "success"
 	message := fmt.Sprintf("Workflow completed: %d tasks", len(logs))
-	for _, log := range logs {
-		if log.Status == "failed" || log.Status == "skipped" || log.Status == "error" {
-			status = "failed"
-			message = fmt.Sprintf("Workflow failed: check task logs for details")
-			break
+
+	if cancelled {
+		status = "cancelled"
+		message = "Workflow was cancelled by user"
+	} else {
+		for _, log := range logs {
+			if log.Status == "failed" || log.Status == "skipped" || log.Status == "error" {
+				status = "failed"
+				message = "Workflow failed: check task logs for details"
+				break
+			}
 		}
 	}
 

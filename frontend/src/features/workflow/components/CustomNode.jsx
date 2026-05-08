@@ -8,6 +8,7 @@ const STATUS_CLASS = {
   failed: 'statusFailed',
   'failed (optional)': 'statusFailedOptional',
   skipped: 'statusSkipped',
+  cancelled: 'statusCancelled',
   error: 'statusFailed',
 };
 
@@ -18,6 +19,7 @@ const STATUS_ICON = {
   failed: '\u2717',
   'failed (optional)': '\u26A0',
   skipped: '\u2192',
+  cancelled: '\u2715',
   error: '\u2717',
 };
 
