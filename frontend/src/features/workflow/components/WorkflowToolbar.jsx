@@ -1,6 +1,6 @@
 import styles from './styles/WorkflowCanvas.module.css';
 
-function WorkflowToolbar({ onExecute, onCancel, onPause, onResume, isRunning, isPaused }) {
+function WorkflowToolbar({ onExecute, onCancel, onPause, onResume, isRunning, isPaused, hasResult, onShowReport, onReset, onClear }) {
   return (
     <div className={styles.toolbar}>
       <button
@@ -23,6 +23,21 @@ function WorkflowToolbar({ onExecute, onCancel, onPause, onResume, isRunning, is
           )}
           <button onClick={onCancel} className={styles.cancelBtn}>
             Cancel Workflow
+          </button>
+        </>
+      )}
+      {(!isRunning || isPaused) && (
+        <>
+          {hasResult && !isRunning && (
+            <button onClick={onShowReport} className={styles.reportBtn}>
+              View Report
+            </button>
+          )}
+          <button onClick={onReset} className={styles.resetBtn}>
+            Reset Workflow
+          </button>
+          <button onClick={onClear} className={styles.clearBtn}>
+            Clear Workflow
           </button>
         </>
       )}

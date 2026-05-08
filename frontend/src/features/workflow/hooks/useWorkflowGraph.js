@@ -198,6 +198,26 @@ export default function useWorkflowGraph({ onGraphChange }) {
     setPendingDelete(null);
   }, []);
 
+  const resetGraph = useCallback(() => {
+    const { nodes: ln, edges: le } = getLayoutedElements(
+      nodesRef.current.map((n) => ({ ...n, data: { ...n.data, execStatus: undefined, execOutput: undefined } })),
+      edgesRef.current
+    );
+    nodesRef.current = ln;
+    edgesRef.current = le;
+    setNodes(ln);
+    setEdges(le);
+    nodeCounterRef.current = Math.max(nodeCounterRef.current, ln.length);
+  }, []);
+
+  const clearGraph = useCallback(() => {
+    nodesRef.current = initialNodes;
+    edgesRef.current = initialEdges;
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    nodeCounterRef.current = 1;
+  }, []);
+
   return {
     nodes,
     edges,
@@ -209,5 +229,7 @@ export default function useWorkflowGraph({ onGraphChange }) {
     updateNode,
     handleConfirmDelete,
     handleCancelDelete,
+    resetGraph,
+    clearGraph,
   };
 }

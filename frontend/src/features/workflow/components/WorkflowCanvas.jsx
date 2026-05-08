@@ -8,7 +8,7 @@ import ConfirmDialog from './ConfirmDialog';
 import NodeDetailPanel from './NodeDetailPanel';
 import WorkflowToolbar from './WorkflowToolbar';
 
-function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunning, isPaused, nodeStatuses }) {
+function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunning, isPaused, nodeStatuses, hasResult, onShowReport, onReset, onClear }) {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
 
@@ -56,6 +56,10 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
           onResume={onResume}
           isRunning={isRunning}
           isPaused={isPaused}
+          hasResult={hasResult}
+          onShowReport={onShowReport}
+          onReset={onReset}
+          onClear={onClear}
         />
 
         <div className={styles.canvas}>

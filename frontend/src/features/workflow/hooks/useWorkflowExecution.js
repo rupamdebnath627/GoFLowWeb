@@ -210,5 +210,8 @@ export default function useWorkflowExecution() {
     resume,
     dismissError: () => setError(''),
     dismissResult: () => setExecResult(null),
+    showResult: () => setExecResult(execResultRef.current),
+    hasResult: !!execResultRef.current,
+    resetStatuses: () => setNodeStatuses({}),
   };
 }

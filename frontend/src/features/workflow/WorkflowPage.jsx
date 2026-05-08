@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import WorkflowCanvas from './components/WorkflowCanvas';
 import StatusBar from './components/StatusBar';
 import ExecutionResult from './components/ExecutionResult';
@@ -15,11 +15,34 @@ function WorkflowPage() {
   };
 
   const graph = useWorkflowGraph({ onGraphChange: handleGraphChange });
-  const { status, error, execResult, nodeStatuses, isRunning, isPaused, execute, cancel, pause, resume, dismissError, dismissResult } = useWorkflowExecution();
+  const { status, error, execResult, nodeStatuses, isRunning, isPaused, execute, cancel, pause, resume, dismissError, dismissResult, showResult, hasResult, resetStatuses } = useWorkflowExecution();
+
+  const handleReset = useCallback(() => {
+    graph.resetGraph();
+    resetStatuses();
+  }, [graph, resetStatuses]);
+
+  const handleClear = useCallback(() => {
+    graph.clearGraph();
+    resetStatuses();
+  }, [graph, resetStatuses]);
 
   return (
     <>
-      <WorkflowCanvas graph={graph} onExecute={execute} onCancel={cancel} onPause={pause} onResume={resume} isRunning={isRunning} isPaused={isPaused} nodeStatuses={nodeStatuses} />
+      <WorkflowCanvas
+        graph={graph}
+        onExecute={execute}
+        onCancel={cancel}
+        onPause={pause}
+        onResume={resume}
+        isRunning={isRunning}
+        isPaused={isPaused}
+        nodeStatuses={nodeStatuses}
+        hasResult={hasResult}
+        onShowReport={showResult}
+        onReset={handleReset}
+        onClear={handleClear}
+      />
       <StatusBar
         error={error}
         warning={warning}
