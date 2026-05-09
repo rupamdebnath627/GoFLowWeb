@@ -17,7 +17,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer database.Close()
 
 	handlers.InitHandlers(database)
 	handlers.InitUserHandlers(database)

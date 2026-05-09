@@ -1,67 +1,57 @@
 package repositories
 
 import (
-	"database/sql"
+	"GoFlowWeb/internal/entities"
 
-	"GoFlowWeb/internal/models"
+	"gorm.io/gorm"
 )
 
 type UserRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewUserRepository(db *sql.DB) *UserRepository {
+func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) Create(username, password, name, email string) (*models.User, error) {
-	res, err := r.db.Exec(
-		"INSERT INTO users (username, password, name, email) VALUES (?, ?, ?, ?)",
-		username, password, name, email,
-	)
-	if err != nil {
+func (r *UserRepository) Create(username, password, name, email string) (*entities.User, error) {
+	user := entities.User{
+		Username: username,
+		Password: password,
+		Name:     name,
+		Email:    email,
+	}
+	if err := r.db.Create(&user).Error; err != nil {
 		return nil, err
 	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
+	return &user, nil
 }
 
-func (r *UserRepository) GetByUsername(username string) (*models.User, error) {
-	var u models.User
-	err := r.db.QueryRow(
-		"SELECT id, username, password, name, email, created_at FROM users WHERE username = ?",
-		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.Name, &u.Email, &u.CreatedAt)
-	if err != nil {
+func (r *UserRepository) GetByUsername(username string) (*entities.User, error) {
+	var user entities.User
+	if err := r.db.Where("username = ?", username).First(&user).Error; err != nil {
 		return nil, err
 	}
-	return &u, nil
+	return &user, nil
 }
 
-func (r *UserRepository) GetByID(id int64) (*models.User, error) {
-	var u models.User
-	err := r.db.QueryRow(
-		"SELECT id, username, password, name, email, created_at FROM users WHERE id = ?",
-		id,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.Name, &u.Email, &u.CreatedAt)
-	if err != nil {
+func (r *UserRepository) GetByID(id uint) (*entities.User, error) {
+	var user entities.User
+	if err := r.db.First(&user, id).Error; err != nil {
 		return nil, err
 	}
-	return &u, nil
+	return &user, nil
 }
 
-func (r *UserRepository) UpdateProfile(id int64, name, email string) (*models.User, error) {
-	_, err := r.db.Exec(
-		"UPDATE users SET name = ?, email = ? WHERE id = ?",
-		name, email, id,
-	)
-	if err != nil {
+func (r *UserRepository) UpdateProfile(id uint, name, email string) (*entities.User, error) {
+	var user entities.User
+	if err := r.db.First(&user, id).Error; err != nil {
 		return nil, err
 	}
-	return r.GetByID(id)
+	user.Name = name
+	user.Email = email
+	if err := r.db.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

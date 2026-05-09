@@ -1,4 +1,7 @@
-package models
+package dtos
+
+// Node and Edge are the graph structures received from the frontend
+// and passed through to the workflow engine.
 
 type Node struct {
 	ID   string   `json:"id"`
@@ -17,11 +20,7 @@ type Edge struct {
 	Target string `json:"target"`
 }
 
-type WorkflowRequest struct {
-	Nodes []Node `json:"nodes"`
-	Edges []Edge `json:"edges"`
-}
-
+// TaskLog is the event DTO streamed over channels/WebSocket during execution.
 type TaskLog struct {
 	NodeID string `json:"node_id"`
 	Label  string `json:"label"`
@@ -29,19 +28,8 @@ type TaskLog struct {
 	Output string `json:"output,omitempty"`
 }
 
-type WorkflowResponse struct {
-	Status  string    `json:"status"`
-	Message string    `json:"message"`
-	Logs    []TaskLog `json:"logs,omitempty"`
-}
-
-type SubmitResponse struct {
-	WorkflowID string `json:"workflow_id"`
-	Status     string `json:"status"`
-}
-
 type WSEvent struct {
-	Type string  `json:"type"` // "task_update" or "workflow_done"
+	Type string   `json:"type"` // "task_update" or "workflow_done"
 	Log  *TaskLog `json:"log,omitempty"`
 	// workflow_done fields
 	Status  string `json:"status,omitempty"`

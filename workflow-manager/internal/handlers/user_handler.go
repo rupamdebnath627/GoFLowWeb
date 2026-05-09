@@ -1,24 +1,24 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 
-	"GoFlowWeb/internal/models"
+	"GoFlowWeb/internal/dtos"
 	"GoFlowWeb/internal/repositories"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 var userRepo *repositories.UserRepository
 
-func InitUserHandlers(db *sql.DB) {
+func InitUserHandlers(db *gorm.DB) {
 	userRepo = repositories.NewUserRepository(db)
 }
 
 func Login(c *gin.Context) {
-	var req models.LoginRequest
+	var req dtos.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "username and password are required"})
 		return
@@ -35,11 +35,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, dtos.ToUserResponse(user))
 }
 
 func Signup(c *gin.Context) {
-	var req models.SignupRequest
+	var req dtos.SignupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "username and password are required"})
 		return
@@ -66,45 +66,43 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusCreated, dtos.ToUserResponse(user))
 }
 
 func GetProfile(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 
-	user, err := userRepo.GetByID(id)
+	user, err := userRepo.GetByID(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, dtos.ToUserResponse(user))
 }
 
 func UpdateProfile(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 
-	var req models.UpdateProfileRequest
+	var req dtos.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	user, err := userRepo.UpdateProfile(id, req.Name, req.Email)
+	user, err := userRepo.UpdateProfile(uint(id), req.Name, req.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile"})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, dtos.ToUserResponse(user))
 }

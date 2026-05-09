@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"GoFlowWeb/internal/models"
+	"GoFlowWeb/internal/dtos"
 )
 
 func bfs(startID string, adj map[string][]string) map[string]bool {
@@ -25,7 +25,7 @@ func bfs(startID string, adj map[string][]string) map[string]bool {
 
 // ValidateWorkflow checks the graph for cycles, unreachable nodes, and nodes that can't reach End.
 // Returns a list of error strings, or nil if valid.
-func ValidateWorkflow(nodes []models.Node, edges []models.Edge) []string {
+func ValidateWorkflow(nodes []dtos.Node, edges []dtos.Edge) []string {
 	var errors []string
 
 	labels := make(map[string]string)

@@ -1,6 +1,6 @@
 package utils
 
-import "GoFlowWeb/internal/models"
+import "GoFlowWeb/internal/dtos"
 
 const (
 	white = 0
@@ -8,7 +8,7 @@ const (
 	black = 2
 )
 
-func FindCycle(nodes []models.Node, edges []models.Edge) []string {
+func FindCycle(nodes []dtos.Node, edges []dtos.Edge) []string {
 	adj := make(map[string][]string)
 	labels := make(map[string]string)
 

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"syscall"
 
-	"GoFlowWeb/internal/models"
+	"GoFlowWeb/internal/dtos"
 )
 
 type taskResult struct {
@@ -117,7 +117,7 @@ func (we *WorkflowEngine) waitIfPaused(ctx context.Context) bool {
 
 // dispatchReady sends "paused" events for all pausable nodes, waits for resume,
 // then launches all of them. Returns true if cancelled while waiting.
-func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, eventCh chan<- models.TaskLog, doneCh chan taskResult) bool {
+func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, eventCh chan<- dtos.TaskLog, doneCh chan taskResult) bool {
 	paused, _ := we.getPauseState()
 
 	// Separate pausable vs non-pausable (start/end always run immediately)
@@ -132,7 +132,7 @@ func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, 
 
 	// Launch non-pausable nodes right away
 	for _, id := range immediate {
-		eventCh <- models.TaskLog{
+		eventCh <- dtos.TaskLog{
 			NodeID: id,
 			Label:  we.labels[id],
 			Status: "running",
@@ -143,7 +143,7 @@ func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, 
 	// If there are pausable nodes, mark them all as paused, wait once, then launch all
 	if len(pausable) > 0 {
 		for _, id := range pausable {
-			eventCh <- models.TaskLog{
+			eventCh <- dtos.TaskLog{
 				NodeID: id,
 				Label:  we.labels[id],
 				Status: "paused",
@@ -153,7 +153,7 @@ func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, 
 			return true
 		}
 		for _, id := range pausable {
-			eventCh <- models.TaskLog{
+			eventCh <- dtos.TaskLog{
 				NodeID: id,
 				Label:  we.labels[id],
 				Status: "running",
@@ -165,7 +165,7 @@ func (we *WorkflowEngine) dispatchReady(ctx context.Context, readyIDs []string, 
 	return false
 }
 
-func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.TaskLog) {
+func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- dtos.TaskLog) {
 	defer close(eventCh)
 
 	totalTasks := len(we.labels)
@@ -177,7 +177,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 
 	for nodeID, count := range we.indegree {
 		if count == 0 {
-			eventCh <- models.TaskLog{
+			eventCh <- dtos.TaskLog{
 				NodeID: nodeID,
 				Label:  we.labels[nodeID],
 				Status: "running",
@@ -198,7 +198,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 				runningCount--
 				completedTasks++
 				completed[result.nodeID] = true
-				eventCh <- models.TaskLog{
+				eventCh <- dtos.TaskLog{
 					NodeID: result.nodeID,
 					Label:  we.labels[result.nodeID],
 					Status: "cancelled",
@@ -208,7 +208,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 			for nodeID := range we.labels {
 				if !completed[nodeID] {
 					completedTasks++
-					eventCh <- models.TaskLog{
+					eventCh <- dtos.TaskLog{
 						NodeID: nodeID,
 						Label:  we.labels[nodeID],
 						Status: "cancelled",
@@ -219,7 +219,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 			return
 
 		case <-we.pauseNotifyCh:
-			eventCh <- models.TaskLog{
+			eventCh <- dtos.TaskLog{
 				NodeID: "engine",
 				Label:  "Workflow paused",
 				Status: "paused",
@@ -240,7 +240,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 				}
 			}
 
-			log := models.TaskLog{
+			log := dtos.TaskLog{
 				NodeID: result.nodeID,
 				Label:  we.labels[result.nodeID],
 				Status: status,
@@ -271,7 +271,7 @@ func (we *WorkflowEngine) Execute(ctx context.Context, eventCh chan<- models.Tas
 					for nodeID := range we.labels {
 						if !completed[nodeID] {
 							completedTasks++
-							eventCh <- models.TaskLog{
+							eventCh <- dtos.TaskLog{
 								NodeID: nodeID,
 								Label:  we.labels[nodeID],
 								Status: "cancelled",
@@ -335,7 +335,7 @@ func (we *WorkflowEngine) runTask(ctx context.Context, nodeID string, doneCh cha
 	}
 }
 
-func StartWorkflow(nodes []models.Node, edges []models.Edge) (<-chan models.TaskLog, context.CancelFunc, *WorkflowEngine) {
+func StartWorkflow(nodes []dtos.Node, edges []dtos.Edge) (<-chan dtos.TaskLog, context.CancelFunc, *WorkflowEngine) {
 	engine := NewWorkflowEngine()
 
 	for _, node := range nodes {
@@ -347,7 +347,7 @@ func StartWorkflow(nodes []models.Node, edges []models.Edge) (<-chan models.Task
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	eventCh := make(chan models.TaskLog, len(nodes)*2)
+	eventCh := make(chan dtos.TaskLog, len(nodes)*2)
 	go engine.Execute(ctx, eventCh)
 	return eventCh, cancel, engine
 }

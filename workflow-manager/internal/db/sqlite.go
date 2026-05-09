@@ -1,87 +1,49 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	"GoFlowWeb/internal/entities"
+
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
 )
 
-func Open() (*sql.DB, error) {
+func Open() (*gorm.DB, error) {
 	dataDir := "data"
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)
 	}
 
 	dbPath := filepath.Join(dataDir, "goflowweb.db")
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping database: %w", err)
+	if err := db.AutoMigrate(&entities.User{}, &entities.WorkflowLog{}, &entities.WorkflowTaskLog{}); err != nil {
+		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
-	if err := migrate(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("run migrations: %w", err)
+	if err := seedDefaultUser(db); err != nil {
+		return nil, fmt.Errorf("seed default user: %w", err)
 	}
 
 	return db, nil
 }
 
-func migrate(db *sql.DB) error {
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS users (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			username   TEXT    NOT NULL UNIQUE,
-			password   TEXT    NOT NULL,
-			name       TEXT    NOT NULL DEFAULT '',
-			email      TEXT    NOT NULL DEFAULT '',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-
-		CREATE TABLE IF NOT EXISTS workflow_logs (
-			id          INTEGER PRIMARY KEY AUTOINCREMENT,
-			workflow_id TEXT    NOT NULL,
-			status      TEXT    NOT NULL,
-			message     TEXT    NOT NULL,
-			created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-
-		CREATE TABLE IF NOT EXISTS task_logs (
-			id              INTEGER PRIMARY KEY AUTOINCREMENT,
-			workflow_log_id INTEGER NOT NULL,
-			node_id         TEXT    NOT NULL,
-			label           TEXT    NOT NULL,
-			status          TEXT    NOT NULL,
-			output          TEXT    NOT NULL DEFAULT '',
-			FOREIGN KEY (workflow_log_id) REFERENCES workflow_logs(id)
-		);
-	`)
-	if err != nil {
-		return err
-	}
-
-	return seedDefaultUser(db)
-}
-
-func seedDefaultUser(db *sql.DB) error {
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", "admin").Scan(&count)
-	if err != nil {
-		return err
-	}
+func seedDefaultUser(db *gorm.DB) error {
+	var count int64
+	db.Model(&entities.User{}).Where("username = ?", "admin").Count(&count)
 	if count == 0 {
-		_, err = db.Exec(
-			"INSERT INTO users (username, password, name, email) VALUES (?, ?, ?, ?)",
-			"admin", "admin", "Admin", "admin@goflowweb.local",
-		)
-		return err
+		return db.Create(&entities.User{
+			Username: "admin",
+			Password: "admin",
+			Name:     "Admin",
+			Email:    "admin@goflowweb.local",
+		}).Error
 	}
 	return nil
 }

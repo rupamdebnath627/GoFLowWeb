@@ -1,19 +1,19 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"GoFlowWeb/internal/models"
+	"GoFlowWeb/internal/dtos"
 	"GoFlowWeb/internal/repositories"
 	"GoFlowWeb/internal/services"
 	"GoFlowWeb/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"gorm.io/gorm"
 )
 
 var registry = services.NewRegistry()
@@ -24,12 +24,12 @@ var upgrader = websocket.Upgrader{
 
 var logRepo *repositories.LogRepository
 
-func InitHandlers(db *sql.DB) {
+func InitHandlers(db *gorm.DB) {
 	logRepo = repositories.NewLogRepository(db)
 }
 
 func ExecuteWorkflow(c *gin.Context) {
-	var req models.WorkflowRequest
+	var req dtos.WorkflowRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -70,7 +70,7 @@ func ExecuteWorkflow(c *gin.Context) {
 	eventCh, cancel, engine := services.StartWorkflow(req.Nodes, req.Edges)
 	id := registry.Register(eventCh, cancel, engine)
 
-	c.JSON(http.StatusAccepted, models.SubmitResponse{
+	c.JSON(http.StatusAccepted, dtos.SubmitResponse{
 		WorkflowID: id,
 		Status:     "submitted",
 	})
@@ -125,7 +125,7 @@ func WorkflowWS(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	var logs []models.TaskLog
+	var logs []dtos.TaskLog
 	cancelled := false
 	writeFailed := false
 
@@ -139,7 +139,7 @@ func WorkflowWS(c *gin.Context) {
 			continue // keep draining channel but don't write
 		}
 
-		evt := models.WSEvent{Type: "task_update", Log: &log}
+		evt := dtos.WSEvent{Type: "task_update", Log: &log}
 		if err := conn.WriteJSON(evt); err != nil {
 			fmt.Printf("WebSocket write failed: %v\n", err)
 			writeFailed = true
@@ -168,7 +168,7 @@ func WorkflowWS(c *gin.Context) {
 		}
 	}
 
-	done := models.WSEvent{
+	done := dtos.WSEvent{
 		Type:    "workflow_done",
 		Status:  status,
 		Message: message,
@@ -191,24 +191,20 @@ func GetWorkflowLogs(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve logs"})
 		return
 	}
-	if logs == nil {
-		logs = []repositories.WorkflowLog{}
-	}
-	c.JSON(http.StatusOK, logs)
+	c.JSON(http.StatusOK, dtos.ToWorkflowLogListResponse(logs))
 }
 
 func GetWorkflowLog(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid log id"})
 		return
 	}
 
-	log, err := logRepo.GetWorkflowLog(id)
+	log, err := logRepo.GetWorkflowLog(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "log not found"})
 		return
 	}
-	c.JSON(http.StatusOK, log)
+	c.JSON(http.StatusOK, dtos.ToWorkflowLogResponse(log))
 }

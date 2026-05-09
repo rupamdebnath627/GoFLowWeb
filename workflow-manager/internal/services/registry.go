@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
-	"GoFlowWeb/internal/models"
+	"GoFlowWeb/internal/dtos"
 )
 
 type WorkflowEntry struct {
-	EventCh <-chan models.TaskLog
+	EventCh <-chan dtos.TaskLog
 	Cancel  context.CancelFunc
 	Engine  *WorkflowEngine
 	claimed bool
@@ -26,7 +26,7 @@ func NewRegistry() *WorkflowRegistry {
 }
 
 // Register stores a new workflow and returns its ID.
-func (r *WorkflowRegistry) Register(eventCh <-chan models.TaskLog, cancel context.CancelFunc, engine *WorkflowEngine) string {
+func (r *WorkflowRegistry) Register(eventCh <-chan dtos.TaskLog, cancel context.CancelFunc, engine *WorkflowEngine) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.seq++
