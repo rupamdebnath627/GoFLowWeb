@@ -25,6 +25,7 @@
 .links {
   display: flex;
   gap: 8px;
+  flex: 1;
 }
 
 .link {
@@ -42,6 +43,34 @@
 }
 
 .active {
+  color: white;
+  background-color: #3a3f4b;
+}
+
+.auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.username {
+  font-size: 13px;
+  color: #61dafb;
+}
+
+.logoutBtn {
+  padding: 5px 12px;
+  background-color: transparent;
+  color: #abb2bf;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.logoutBtn:hover {
   color: white;
   background-color: #3a3f4b;
 }

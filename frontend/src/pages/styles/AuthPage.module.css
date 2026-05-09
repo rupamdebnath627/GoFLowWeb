@@ -1,0 +1,102 @@
+.container {
+  height: calc(100vh - 48px);
+  background-color: #21252b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  background-color: #282c34;
+  border: 1px solid #3a3f4b;
+  border-radius: 8px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #61dafb;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  color: #abb2bf;
+}
+
+.field input {
+  padding: 10px 12px;
+  background-color: #1e2028;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: #61dafb;
+}
+
+.submitBtn {
+  padding: 12px;
+  background-color: #3a3f4b;
+  color: #61dafb;
+  border: 1px solid #61dafb;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-color: #4a5060;
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  background-color: #3d1f1f;
+  border: 1px solid #d32f2f;
+  color: #ef9a9a;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.footer {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #abb2bf;
+}
+
+.footer a {
+  color: #61dafb;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}

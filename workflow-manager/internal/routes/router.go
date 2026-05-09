@@ -7,6 +7,11 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
+	r.POST("/login", handlers.Login)
+	r.POST("/signup", handlers.Signup)
+	r.GET("/users/:id", handlers.GetProfile)
+	r.PUT("/users/:id", handlers.UpdateProfile)
+
 	r.POST("/execute", handlers.ExecuteWorkflow)
 	r.POST("/cancel/:id", handlers.CancelWorkflow)
 	r.POST("/pause/:id", handlers.PauseWorkflow)

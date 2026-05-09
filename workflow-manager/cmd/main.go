@@ -20,6 +20,7 @@ func main() {
 	defer database.Close()
 
 	handlers.InitHandlers(database)
+	handlers.InitUserHandlers(database)
 
 	r := gin.Default()
 	r.Use(cors.Default())
