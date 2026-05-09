@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { validateWorkflow } from '../utils/validateGraph';
 
 const API_BASE = 'http://localhost:8080';
 
 export default function useWorkflowExecution() {
+  const user = useSelector((state) => state.user.user);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [execResult, setExecResult] = useState(null);
@@ -48,7 +50,10 @@ export default function useWorkflowExecution() {
     try {
       const response = await fetch(`${API_BASE}/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-ID': String(user?.id || ''),
+        },
         body: JSON.stringify(payload),
       });
 

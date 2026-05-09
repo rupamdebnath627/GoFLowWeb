@@ -16,8 +16,9 @@ func NewLogRepository(db *gorm.DB) *LogRepository {
 }
 
 // SaveWorkflowLog saves a completed workflow execution and its task logs.
-func (r *LogRepository) SaveWorkflowLog(workflowID, status, message string, taskLogs []dtos.TaskLog) error {
+func (r *LogRepository) SaveWorkflowLog(userID uint, workflowID, status, message string, taskLogs []dtos.TaskLog) error {
 	wl := entities.WorkflowLog{
+		UserID:     userID,
 		WorkflowID: workflowID,
 		Status:     status,
 		Message:    message,
@@ -33,19 +34,20 @@ func (r *LogRepository) SaveWorkflowLog(workflowID, status, message string, task
 	return r.db.Create(&wl).Error
 }
 
-// GetAllWorkflowLogs returns all workflow logs (without task details).
-func (r *LogRepository) GetAllWorkflowLogs() ([]entities.WorkflowLog, error) {
+// GetWorkflowLogsByUser returns all workflow logs for a specific user.
+func (r *LogRepository) GetWorkflowLogsByUser(userID uint) ([]entities.WorkflowLog, error) {
 	var logs []entities.WorkflowLog
-	if err := r.db.Order("created_at DESC").Find(&logs).Error; err != nil {
+	if err := r.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&logs).Error; err != nil {
 		return nil, err
 	}
 	return logs, nil
 }
 
 // GetWorkflowLog returns a single workflow log with all its task logs.
-func (r *LogRepository) GetWorkflowLog(id uint) (*entities.WorkflowLog, error) {
+// Returns nil if the log doesn't belong to the given user.
+func (r *LogRepository) GetWorkflowLog(id, userID uint) (*entities.WorkflowLog, error) {
 	var wl entities.WorkflowLog
-	if err := r.db.Preload("Tasks").First(&wl, id).Error; err != nil {
+	if err := r.db.Preload("Tasks").Where("id = ? AND user_id = ?", id, userID).First(&wl).Error; err != nil {
 		return nil, err
 	}
 	return &wl, nil

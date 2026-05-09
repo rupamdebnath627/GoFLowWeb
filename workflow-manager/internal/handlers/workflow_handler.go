@@ -28,7 +28,27 @@ func InitHandlers(db *gorm.DB) {
 	logRepo = repositories.NewLogRepository(db)
 }
 
+// getUserID reads the X-User-ID header and returns the parsed user ID.
+func getUserID(c *gin.Context) (uint, bool) {
+	idStr := c.GetHeader("X-User-ID")
+	if idStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing X-User-ID header"})
+		return 0, false
+	}
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid X-User-ID header"})
+		return 0, false
+	}
+	return uint(id), true
+}
+
 func ExecuteWorkflow(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		return
+	}
+
 	var req dtos.WorkflowRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -68,7 +88,7 @@ func ExecuteWorkflow(c *gin.Context) {
 	}
 
 	eventCh, cancel, engine := services.StartWorkflow(req.Nodes, req.Edges)
-	id := registry.Register(eventCh, cancel, engine)
+	id := registry.Register(eventCh, cancel, engine, userID)
 
 	c.JSON(http.StatusAccepted, dtos.SubmitResponse{
 		WorkflowID: id,
@@ -179,14 +199,19 @@ func WorkflowWS(c *gin.Context) {
 
 	// Persist execution result
 	if logRepo != nil {
-		if err := logRepo.SaveWorkflowLog(id, status, message, logs); err != nil {
+		if err := logRepo.SaveWorkflowLog(entry.UserID, id, status, message, logs); err != nil {
 			fmt.Printf("Failed to save workflow log: %v\n", err)
 		}
 	}
 }
 
 func GetWorkflowLogs(c *gin.Context) {
-	logs, err := logRepo.GetAllWorkflowLogs()
+	userID, ok := getUserID(c)
+	if !ok {
+		return
+	}
+
+	logs, err := logRepo.GetWorkflowLogsByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve logs"})
 		return
@@ -195,13 +220,18 @@ func GetWorkflowLogs(c *gin.Context) {
 }
 
 func GetWorkflowLog(c *gin.Context) {
+	userID, ok := getUserID(c)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid log id"})
 		return
 	}
 
-	log, err := logRepo.GetWorkflowLog(uint(id))
+	log, err := logRepo.GetWorkflowLog(uint(id), userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "log not found"})
 		return

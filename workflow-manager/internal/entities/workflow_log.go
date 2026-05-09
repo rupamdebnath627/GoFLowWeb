@@ -4,10 +4,12 @@ import "gorm.io/gorm"
 
 type WorkflowLog struct {
 	gorm.Model
+	UserID     uint              `gorm:"not null;index"`
 	WorkflowID string            `gorm:"not null"`
 	Status     string            `gorm:"not null"`
 	Message    string            `gorm:"not null"`
 	Tasks      []WorkflowTaskLog `gorm:"foreignKey:WorkflowLogID"`
+	User       User              `gorm:"foreignKey:UserID"`
 }
 
 type WorkflowTaskLog struct {

@@ -31,6 +31,7 @@ type SubmitResponse struct {
 
 type WorkflowLogResponse struct {
 	ID         uint                      `json:"id"`
+	UserID     uint                      `json:"user_id"`
 	WorkflowID string                    `json:"workflow_id"`
 	Status     string                    `json:"status"`
 	Message    string                    `json:"message"`
@@ -50,6 +51,7 @@ type WorkflowTaskLogResponse struct {
 func ToWorkflowLogResponse(wl *entities.WorkflowLog) WorkflowLogResponse {
 	resp := WorkflowLogResponse{
 		ID:         wl.ID,
+		UserID:     wl.UserID,
 		WorkflowID: wl.WorkflowID,
 		Status:     wl.Status,
 		Message:    wl.Message,

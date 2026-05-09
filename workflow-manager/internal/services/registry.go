@@ -12,6 +12,7 @@ type WorkflowEntry struct {
 	EventCh <-chan dtos.TaskLog
 	Cancel  context.CancelFunc
 	Engine  *WorkflowEngine
+	UserID  uint
 	claimed bool
 }
 
@@ -26,12 +27,12 @@ func NewRegistry() *WorkflowRegistry {
 }
 
 // Register stores a new workflow and returns its ID.
-func (r *WorkflowRegistry) Register(eventCh <-chan dtos.TaskLog, cancel context.CancelFunc, engine *WorkflowEngine) string {
+func (r *WorkflowRegistry) Register(eventCh <-chan dtos.TaskLog, cancel context.CancelFunc, engine *WorkflowEngine, userID uint) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.seq++
 	id := fmt.Sprintf("wf-%d", r.seq)
-	r.m[id] = &WorkflowEntry{EventCh: eventCh, Cancel: cancel, Engine: engine}
+	r.m[id] = &WorkflowEntry{EventCh: eventCh, Cancel: cancel, Engine: engine, UserID: userID}
 	return id
 }
 
