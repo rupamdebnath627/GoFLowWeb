@@ -124,6 +124,44 @@
   background-color: #4a2020;
 }
 
+.saveBtn {
+  padding: 8px 16px;
+  cursor: pointer;
+  background-color: #1565c0;
+  color: white;
+  border: 1px solid #2196f3;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background-color: #0d47a1;
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.updateBtn {
+  padding: 8px 16px;
+  cursor: pointer;
+  background-color: #2e7d32;
+  color: white;
+  border: 1px solid #4caf50;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.updateBtn:hover:not(:disabled) {
+  background-color: #1b5e20;
+}
+
+.updateBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .canvas {
   flex: 1;
 }

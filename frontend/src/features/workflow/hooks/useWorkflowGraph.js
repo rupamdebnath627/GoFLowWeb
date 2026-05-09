@@ -218,6 +218,19 @@ export default function useWorkflowGraph({ onGraphChange }) {
     nodeCounterRef.current = 1;
   }, []);
 
+  const loadGraph = useCallback((savedNodes, savedEdges) => {
+    const { nodes: ln, edges: le } = getLayoutedElements(savedNodes, savedEdges);
+    nodesRef.current = ln;
+    edgesRef.current = le;
+    setNodes(ln);
+    setEdges(le);
+    const maxId = savedNodes.reduce((max, n) => {
+      const match = n.id.match(/^node-(\d+)$/);
+      return match ? Math.max(max, parseInt(match[1], 10)) : max;
+    }, 0);
+    nodeCounterRef.current = maxId + 1;
+  }, []);
+
   return {
     nodes,
     edges,
@@ -231,5 +244,6 @@ export default function useWorkflowGraph({ onGraphChange }) {
     handleCancelDelete,
     resetGraph,
     clearGraph,
+    loadGraph,
   };
 }

@@ -7,8 +7,9 @@ import CustomNode from './CustomNode';
 import ConfirmDialog from './ConfirmDialog';
 import NodeDetailPanel from './NodeDetailPanel';
 import WorkflowToolbar from './WorkflowToolbar';
+import SavedWorkflowsPanel from './SavedWorkflowsPanel';
 
-function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunning, isPaused, nodeStatuses, hasResult, onShowReport, onReset, onClear }) {
+function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunning, isPaused, nodeStatuses, hasResult, onShowReport, onReset, onClear, onSave, onUpdate, activeWorkflowId, savedWorkflows, savedWorkflowsLoading, onFetchWorkflows, onLoadWorkflow, onDeleteWorkflow }) {
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
 
@@ -46,6 +47,14 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
 
   return (
     <div className={styles.container}>
+      <SavedWorkflowsPanel
+        savedWorkflows={savedWorkflows}
+        loading={savedWorkflowsLoading}
+        activeWorkflowId={activeWorkflowId}
+        onFetch={onFetchWorkflows}
+        onLoad={onLoadWorkflow}
+        onDelete={onDeleteWorkflow}
+      />
       <NodeForm nodes={nodes} onAddNode={handleAddNode} />
 
       <div className={styles.main}>
@@ -60,6 +69,9 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
           onShowReport={onShowReport}
           onReset={onReset}
           onClear={onClear}
+          onSave={onSave}
+          onUpdate={onUpdate}
+          activeWorkflowId={activeWorkflowId}
         />
 
         <div className={styles.canvas}>

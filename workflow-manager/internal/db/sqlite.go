@@ -23,7 +23,7 @@ func Open() (*gorm.DB, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	if err := db.AutoMigrate(&entities.User{}, &entities.WorkflowLog{}, &entities.WorkflowTaskLog{}); err != nil {
+	if err := db.AutoMigrate(&entities.User{}, &entities.Workflow{}, &entities.WorkflowLog{}, &entities.WorkflowTaskLog{}); err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 

@@ -20,9 +20,14 @@ func main() {
 
 	handlers.InitHandlers(database)
 	handlers.InitUserHandlers(database)
+	handlers.InitSavedWorkflowHandlers(database)
 
 	r := gin.Default()
-	r.Use(cors.Default())
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "X-User-ID"}
+	r.Use(cors.New(config))
 
 	routes.SetupRouter(r)
 

@@ -12,6 +12,12 @@ func SetupRouter(r *gin.Engine) {
 	r.GET("/users/:id", handlers.GetProfile)
 	r.PUT("/users/:id", handlers.UpdateProfile)
 
+	r.POST("/workflows", handlers.SaveWorkflow)
+	r.GET("/workflows", handlers.GetSavedWorkflows)
+	r.GET("/workflows/:id", handlers.GetSavedWorkflow)
+	r.PUT("/workflows/:id", handlers.UpdateSavedWorkflow)
+	r.DELETE("/workflows/:id", handlers.DeleteSavedWorkflow)
+
 	r.POST("/execute", handlers.ExecuteWorkflow)
 	r.POST("/cancel/:id", handlers.CancelWorkflow)
 	r.POST("/pause/:id", handlers.PauseWorkflow)

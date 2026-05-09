@@ -1,6 +1,7 @@
 package dtos
 
 import (
+	"encoding/json"
 	"time"
 
 	"GoFlowWeb/internal/entities"
@@ -74,6 +75,36 @@ func ToWorkflowLogListResponse(logs []entities.WorkflowLog) []WorkflowLogRespons
 	result := make([]WorkflowLogResponse, len(logs))
 	for i := range logs {
 		result[i] = ToWorkflowLogResponse(&logs[i])
+	}
+	return result
+}
+
+type WorkflowResponse struct {
+	ID        uint            `json:"id"`
+	UserID    uint            `json:"user_id"`
+	Name      string          `json:"name"`
+	Nodes     json.RawMessage `json:"nodes"`
+	Edges     json.RawMessage `json:"edges"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+func ToWorkflowResponse(w *entities.Workflow) WorkflowResponse {
+	return WorkflowResponse{
+		ID:        w.ID,
+		UserID:    w.UserID,
+		Name:      w.Name,
+		Nodes:     json.RawMessage(w.Nodes),
+		Edges:     json.RawMessage(w.Edges),
+		CreatedAt: w.CreatedAt,
+		UpdatedAt: w.UpdatedAt,
+	}
+}
+
+func ToWorkflowListResponse(workflows []entities.Workflow) []WorkflowResponse {
+	result := make([]WorkflowResponse, len(workflows))
+	for i := range workflows {
+		result[i] = ToWorkflowResponse(&workflows[i])
 	}
 	return result
 }
