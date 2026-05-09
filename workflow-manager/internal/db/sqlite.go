@@ -8,6 +8,7 @@ import (
 	"GoFlowWeb/internal/entities"
 
 	"github.com/glebarez/sqlite"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -37,13 +38,20 @@ func Open() (*gorm.DB, error) {
 func seedDefaultUser(db *gorm.DB) error {
 	var count int64
 	db.Model(&entities.User{}).Where("username = ?", "admin").Count(&count)
+
 	if count == 0 {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+
 		return db.Create(&entities.User{
 			Username: "admin",
-			Password: "admin",
+			Password: string(hashedPassword),
 			Name:     "Admin",
 			Email:    "admin@goflowweb.local",
 		}).Error
 	}
+
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"GoFlowWeb/internal/repositories"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -30,7 +31,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if user.Password != req.Password {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid username or password"})
 		return
 	}

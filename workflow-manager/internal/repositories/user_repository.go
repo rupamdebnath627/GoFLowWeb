@@ -3,6 +3,7 @@ package repositories
 import (
 	"GoFlowWeb/internal/entities"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -15,9 +16,15 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 }
 
 func (r *UserRepository) Create(username, password, name, email string) (*entities.User, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+
+	if err != nil {
+		return nil, err
+	}
+
 	user := entities.User{
 		Username: username,
-		Password: password,
+		Password: string(bytes),
 		Name:     name,
 		Email:    email,
 	}
