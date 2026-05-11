@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { addEdge, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import getLayoutedElements from './useLayout';
-import { validateWorkflow } from '../utils/validateGraph';
+import { validateWorkflow, findCycle } from '../utils/validateGraph';
 
 const START_NODE = { id: 'start', position: { x: 0, y: 0 }, data: { label: 'Start' }, type: 'custom', deletable: false };
 const END_NODE = { id: 'end', position: { x: 0, y: 0 }, data: { label: 'End' }, type: 'custom', deletable: false };
@@ -142,9 +142,60 @@ export default function useWorkflowGraph({ onGraphChange }) {
     [simulateDeletion, describeRemovals, applyDeletion]
   );
 
+  const [connectionError, setConnectionError] = useState(null);
+  const connectionErrorTimerRef = useRef(null);
+
+  const showConnectionError = useCallback((message) => {
+    if (connectionErrorTimerRef.current) clearTimeout(connectionErrorTimerRef.current);
+    setConnectionError(message);
+    connectionErrorTimerRef.current = setTimeout(() => setConnectionError(null), 4000);
+  }, []);
+
+  const dismissConnectionError = useCallback(() => {
+    if (connectionErrorTimerRef.current) clearTimeout(connectionErrorTimerRef.current);
+    setConnectionError(null);
+  }, []);
+
   const onConnect = useCallback(
-    (connection) => setEdges((eds) => addEdge({ ...connection, type: 'smoothstep', markerEnd: { type: 'arrowclosed', width: 15, height: 15 } }, eds)),
-    []
+    (connection) => {
+      // Self-loop check
+      if (connection.source === connection.target) {
+        showConnectionError('Cannot connect a node to itself.');
+        return;
+      }
+
+      // Duplicate edge check
+      const duplicate = edgesRef.current.some(
+        (e) => e.source === connection.source && e.target === connection.target
+      );
+      if (duplicate) {
+        showConnectionError('This connection already exists.');
+        return;
+      }
+
+      // Cycle detection: simulate adding the edge and check for cycles
+      const newEdge = {
+        id: `e-${connection.source}-${connection.target}`,
+        source: connection.source,
+        target: connection.target,
+        type: 'smoothstep',
+        markerEnd: { type: 'arrowclosed', width: 15, height: 15 },
+      };
+      const simulatedEdges = [...edgesRef.current, newEdge];
+      const cycle = findCycle(nodesRef.current, simulatedEdges);
+      if (cycle) {
+        showConnectionError(`This connection would create a cycle: ${cycle.join(' → ')}`);
+        return;
+      }
+
+      setEdges((eds) =>
+        addEdge(
+          { ...connection, type: 'smoothstep', markerEnd: { type: 'arrowclosed', width: 15, height: 15 } },
+          eds
+        )
+      );
+    },
+    [showConnectionError]
   );
 
   const handleAddNode = ({ label, type, parentId, childId, command, optional }) => {
@@ -235,6 +286,7 @@ export default function useWorkflowGraph({ onGraphChange }) {
     nodes,
     edges,
     pendingDelete,
+    connectionError,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -242,6 +294,7 @@ export default function useWorkflowGraph({ onGraphChange }) {
     updateNode,
     handleConfirmDelete,
     handleCancelDelete,
+    dismissConnectionError,
     resetGraph,
     clearGraph,
     loadGraph,

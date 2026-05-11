@@ -17,6 +17,7 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
     nodes,
     edges,
     pendingDelete,
+    connectionError,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -24,6 +25,7 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
     updateNode,
     handleConfirmDelete,
     handleCancelDelete,
+    dismissConnectionError,
   } = graph;
 
   const nodesWithStatus = useMemo(() => {
@@ -89,6 +91,12 @@ function WorkflowCanvas({ graph, onExecute, onCancel, onPause, onResume, isRunni
             <Background />
             <Controls />
           </ReactFlow>
+          {connectionError && (
+            <div className={styles.connectionErrorToast}>
+              {connectionError}
+              <button className={styles.toastDismiss} onClick={dismissConnectionError}>×</button>
+            </div>
+          )}
         </div>
       </div>
 
