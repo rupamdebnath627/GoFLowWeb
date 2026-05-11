@@ -5,7 +5,7 @@ function HomePage() {
   return (
     <div className={styles.container}>
       <div className={styles.hero}>
-        <h1 className={styles.title}>GoFlowWeb</h1>
+        <h1 className={styles.title}>GoFlow</h1>
         <p className={styles.subtitle}>
           Visual workflow orchestration — design DAG-based workflows and execute them as shell commands with real-time status streaming.
         </p>

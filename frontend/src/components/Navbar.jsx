@@ -16,7 +16,7 @@ function Navbar() {
 
   return (
     <nav className={styles.navbar}>
-      <Link to="/" className={styles.brand}>GoFlowWeb</Link>
+      <Link to="/" className={styles.brand}>GoFlow</Link>
       <div className={styles.links}>
         <Link
           to="/"
@@ -36,7 +36,7 @@ function Navbar() {
       <div className={styles.auth}>
         {user ? (
           <>
-            <span className={styles.username}>{user.username}</span>
+            <span className={styles.username}>{user.name}</span>
             <button onClick={handleLogout} className={styles.logoutBtn}>Logout</button>
           </>
         ) : (
